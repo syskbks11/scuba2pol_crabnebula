@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
-
-# In[1]:
-
 
 ## Graphic libraries
 import matplotlib as mpl
@@ -37,16 +33,18 @@ mpl.rcParams.update({'axes.grid':True})
 mpl.rcParams.update({'grid.linestyle':':'})
 mpl.rcParams.update({'figure.figsize':[12,9]})
 
-# In[2]:
+from astropy.io import fits
 
-
-import scuba2tool, scuba2integral
 from scuba2tool import plotmap
+import scuba2tool
 
+subset_priors = ['20210807_00067_0002',
+                 '20210807_00068_0002',
+                 '20210818_00067_0002',
+                 '20210825_00045_0002',
+                 '20210825_00046_0002']
 
-# In[3]:
-
-def main(fdir,name_format, do_subset=True):
+def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=subset_priors, split_ext=''):
 
     # parameters
     delt_gal = 6/3600
@@ -57,729 +55,531 @@ def main(fdir,name_format, do_subset=True):
 
     r_signal = 0.09
     r_rms    = 0.03
+    if do_subset is None:
+        do_subset = []
+    if split_ext != '':
+        split_ext = '_'+split_ext
 
-    # In[4]:
-
-    catmap = scuba2tool.get_catmap(fdir)
-
-    a = scuba2tool.get_scuba2map(fdir,catinfo=True,delt_gal=delt_gal,delt=delt_fk5,catmap=catmap)
-
-    subset_priors = ['20210807_00067_0002',
-                     '20210807_00068_0002',
-                     '20210818_00067_0002',
-                     '20210825_00045_0002',
-                     '20210825_00046_0002']
-
-    asub = []
-    if do_subset:
-        asub = [scuba2tool.get_scuba2map(fdir,prior=p,catinfo=True,delt_gal=delt_gal,delt=delt_fk5,catmap=catmap) for p in subset_priors]
-
-    # In[5]:
-
-    fcf_beam = scuba2tool.get_fcfbeam()
-    fcf = scuba2tool.get_fcf()
+    if fn_astmask is not None:
+        print(fn_astmask)
+        astmask = fits.open(fn_astmask)
+        pcamask = fits.open(fn_pcamask)
+        thismap = scuba2tool.get_scuba2map(fdir,astmask=astmask,pcamask=pcamask,ext=split_ext)
+        thismap_sub = [scuba2tool.get_scuba2map(fdir,prior=p,astmask=astmask,pcamask=pcamask,wcs_target=thismap.wcs) for p in do_subset]
+        pass
+    else:
+        thismap = scuba2tool.get_scuba2map(fdir,ext=split_ext)
+        thismap_sub = [scuba2tool.get_scuba2map(fdir,prior=p,wcs_target=thismap.wcs) for p in do_subset]
+        pass
 
     cent = scuba2tool.get_tauAcent()
+    fact = scuba2tool.get_fcf()
 
-    cra = cent.ra.deg
-    cdec = cent.dec.deg
+    # IQU
+    fig,ax = scuba2tool.wcs_subplots(thismap.wcs, ncols=3)
 
-    radeccent = (cra, cdec)
-    radeccent_l = (cra-offsetx_rms, cdec)
-    radeccent_r = (cra+offsetx_rms, cdec)
-    radeccent_u = (cra, cdec+offsety_rms)
-    radeccent_b = (cra, cdec-offsety_rms)
+    plotmap(thismap.i*fact,thismap.wcs,title='I'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=-0.2,vmax=4,fig=fig,ax=ax[0]) 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    cgl = cent.galactic.l.deg
-    cgb = cent.galactic.b.deg
+    plotmap(thismap.q*fact,thismap.wcs,title='Q'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=-0.2,vmax=1,fig=fig,ax=ax[1])
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    glgbcent  = (cgl, cgb)
-
-
-    # In[6]:
-
-    fig, ax = plt.subplots(figsize=(21, 4), ncols=4)
-
-    ymax = np.max([np.nanmax(a.dec),np.nanmax(a.c_dec)]) +0.01
-    ymin = np.min([np.nanmin(a.dec),np.nanmin(a.c_dec)]) -0.01
-    xmax = np.max([np.nanmax(a.ra), np.nanmax(a.c_ra)]) +0.01
-    xmin = np.min([np.nanmin(a.ra), np.nanmin(a.c_ra)]) -0.01
-
-    #vmin=np.nanmin(a.i*495*1.35*1e3)*0.2
-    #vmax=np.nanmax(a.i*495*1.35*1e3)*0.2
-
-    vmin=-160
-    vmax=220
-
-    plotmap(a.radec, a.i*fcf_beam, a.radecbins, fig=fig, ax=ax[0],vmin=vmin,vmax=vmax)
-    ax[0].set_title("Iext [mJy/beam]")
-    ax[0].set_xlim(xmin,xmax)
-    ax[0].set_ylim(ymin,ymax)
-
-    plotmap(a.radec, a.iauto*fcf_beam, a.radecbins, fig=fig, ax=ax[1],vmin=vmin,vmax=vmax)
-    ax[1].set_title("Iauto [mJy/beam]")
-    ax[1].set_xlim(xmin,xmax)
-    ax[1].set_ylim(ymin,ymax)
-
-    plotmap(a.radec, (a.iauto - a.i)*fcf_beam, a.radecbins, fig=fig, ax=ax[2],vmin=vmin*0.1,vmax=vmax*0.1)
-    ax[2].set_title("Iauto - Iext [mJy/beam]")
-    ax[2].set_xlim(xmin,xmax)
-    ax[2].set_ylim(ymin,ymax)
-
-    plotmap(a.c_radec, a.c_i, a.c_radecbins, fig=fig, ax=ax[3],vmin=vmin,vmax=vmax)
-    ax[3].set_title("Icat [mJy/beam]")
-    ax[3].set_xlim(xmin,xmax)
-    ax[3].set_ylim(ymin,ymax)
+    plotmap(thismap.u*fact,thismap.wcs,title='U'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=-1,vmax=0.2,fig=fig,ax=ax[2])
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
     fig.tight_layout()
-    plt.clf()
-    plt.close()
-
-    #Comparison with cat
-
-    fig, ax = plt.subplots(figsize=(21, 4), ncols=4)
-    ax[0].plot(a.radec[0], a.radec[0]-a.c_radec[0], 'b.')
-    ax[1].plot(a.radec[1], a.radec[1]-a.c_radec[1], 'r.')
-    ax[0].set_title("Diff. btw simple RA and RA in catfile")
-    ax[1].set_title("Diff. btw simple DEC and DEC in catfile")
-    ax[0].set_ylabel(r"$\Delta$ RA [deg]")
-    ax[1].set_ylabel(r"$\Delta$ DEC [deg]")
-    ax[0].set_xlabel("RA (simple) [deg]")
-    ax[1].set_xlabel("DEC (simple) [deg]")
-
-    plotmap(a.radec, a.c_i/(a.i*fcf_beam), a.radecbins, fig=fig, ax=ax[2], vmin=1-3e-8, vmax=1+3e-8)
-    ax[2].set_title("Icat/Iext")
-    ax[2].set_xlim(xmin,xmax)
-    ax[2].set_ylim(ymin,ymax)
-
-    ax[3].hist(a.c_i/(a.i*fcf_beam),bins=100)
-    ax[3].set_ylabel('number')
-    ax[3].set_xlabel('Icat/Iext')
-    ax[3].set_ylim(None,850)
-
-    fig.tight_layout()
-    # Not sure for a reason of these differences...
-
-
-    # In[7]:
-
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    plt.hist(a.psi, bins=200, color='b', alpha=0.7)
-    plt.ylabel("#")
-    plt.xlabel("parallactic angle [deg]")
-    plt.clf()
-    plt.close()
-
-
-    # In[8]:
-
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-    #tmp = np.copy(a.astmask)
-    #tmp[np.isnan(a.astmask)&(~np.isnan(autoi.i))] = 0
-    plotmap(a.c_radec, np.abs(a.iauto/a.diauto), a.c_radecbins,
-            fig=fig, ax=ax, count=5, vmin=0, vmax=5)
-    plt.title(r'I$\rm_{FK5}$ S/N')
-
-    plt.clf()
-    plt.close()
-
-
-    # In[9]:
-
-
-    keys = [a.i*fcf, a.q*fcf, a.u*fcf]
-    name = [r'I$\rm_{FK5}$ [mJy/arcsec$^2$]', r'Q$\rm_{FK5}$ [mJy/arcsec$^2$]', r'U$\rm_{FK5}$ [mJy/arcsec$^2$]']
-
-    fig, ax = plt.subplots(figsize=(16, 4), ncols=len(keys))
-
-    for ii, d in enumerate(keys):
-        plotmap(a.c_radec, d, bins=a.c_radecbins, title=name[ii],
-                fig=fig, ax=ax[ii], vmax=np.nanmax(d)*0.2, vmin=np.nanmin(d)*0.2)
-
-    fig.tight_layout()
-
     fig.savefig(name_format+"_iqu.pdf")
     plt.clf()
     plt.close()
 
+    # Pol
+    fig,ax = scuba2tool.wcs_subplots(thismap.wcs, ncols=3)
 
-    # In[10]:
+    d = scuba2tool.polamp(thismap.q,thismap.u) * fact
+    s = np.abs(thismap.i/thismap.di) < 2
+    d[s] = 0
+    plotmap(d,thismap.wcs,title='PolAmp'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=0, vmax=1, fig=fig,ax=ax[0]) 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
+    d = scuba2tool.polang(thismap.q,thismap.u)
+    d[s] = 0
+    plotmap(d,thismap.wcs,title='PolAngle'+r'$_{\rm FK5}$'+' [deg]', vmin=30, vmax=180, fig=fig,ax=ax[1])
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    keys = [a.gi*fcf, a.gq*fcf, a.gu*fcf]
-    name = [r'I$\rm_{GAL}$ [mJy/arcsec$^2$]', r'Q$\rm_{GAL}$ [mJy/arcsec$^2$]', r'U$\rm_{GAL}$ [mJy/arcsec$^2$]']
-
-    fig, ax = plt.subplots(figsize=(16, 4), ncols=len(keys))
-
-    for ii, d in enumerate(keys):
-        plotmap(a.c_glgb, d, bins=a.c_glgbbins, title=name[ii],
-                fig=fig, ax=ax[ii], vmax=np.nanmax(d)*0.2, vmin=np.nanmin(d)*0.2)
-
-    fig.tight_layout()
-
-    fig.savefig(name_format+"_galiqu.pdf")
-    plt.clf()
-    plt.close()
-
-
-    # In[11]:
-
-
-    amp = scuba2tool.polamp(a.q, a.u)
-    ang = scuba2tool.polang(a.q, a.u)
-
-    keys = [amp*fcf, ang]
-    name = [r'PolAmpl$\rm_{FK5}$ [mJy/arcsec$^2$]', r'PolAngle$\rm_{FK5}$ [deg]']
-    maxv = [0.8, 180]
-
-    fig, ax = plt.subplots(figsize=(11, 4), ncols=len(keys))
-
-    for d in keys:
-        sigma = np.abs(a.i/a.di)
-        d[sigma < 2] = 0
-
-    for ii, d in enumerate(keys):
-        plotmap(a.c_radec, d, bins=a.c_radecbins, title=name[ii],
-                fig=fig, ax=ax[ii], vmax=maxv[ii], vmin=0)
+    d = scuba2tool.polfrac(thismap.i,thismap.q,thismap.u)
+    d[s] = 0
+    plotmap(d,thismap.wcs,title='PolFrac'+r'$_{\rm FK5}$'+' ', vmin=0, vmax=0.3, fig=fig,ax=ax[2])
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
     fig.tight_layout()
-
     fig.savefig(name_format+"_pol.pdf")
     plt.clf()
     plt.close()
 
-    fig, ax = plt.subplots(figsize=(5.5, 4))
+    # IQU GAL
+    fig,ax = scuba2tool.wcs_subplots(thismap.gal.wcs, ncols=3)
 
-    plotmap(a.c_radec, scuba2tool.diqu(a.di, a.dq, a.du)*fcf, bins=a.c_radecbins,
-            title=r'Total RMS$\rm_{FK5}$ [mJy/arcsec$^2$]',
-            fig=fig, ax=ax, vmin=0, vmax=0.3)
+    plotmap(thismap.gal.i*fact,thismap.gal.wcs,title='I'+r'$_{\rm GAL}$'+' [mJy/arcsec2]',
+            vmin=-0.2,vmax=4,fig=fig,ax=ax[0])
+    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.07,ax[0],
+                              transform='galactic',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.08,ax[0],
+                              transform='galactic',ls='-',facecolor='none',edgecolor='w')
+
+    plotmap(thismap.gal.q*fact,thismap.gal.wcs,title='Q'+r'$_{\rm GAL}$'+' [mJy/arcsec2]',
+            vmin=-1,vmax=0.2,fig=fig,ax=ax[1])
+    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.07,ax[1],
+                              transform='galactic',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.08,ax[1],
+                              transform='galactic',ls='-',facecolor='none',edgecolor='w')
+
+    plotmap(thismap.gal.u*fact,thismap.gal.wcs,title='U'+r'$_{\rm GAL}$'+' [mJy/arcsec2]',
+            vmin=-0.2,vmax=1,fig=fig,ax=ax[2])
+    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.07,ax[2],
+                              transform='galactic',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.08,ax[2],
+                              transform='galactic',ls='-',facecolor='none',edgecolor='w')
 
     fig.tight_layout()
-
-    fig.savefig(name_format+"_rms.pdf")
+    fig.savefig(name_format+"_galiqu.pdf")
     plt.clf()
     plt.close()
 
-    # In[12]:
+    fig,ax = scuba2tool.wcs_subplots(thismap.gal.wcs, ncols=3)
 
+    d = scuba2tool.polamp(thismap.gal.q,thismap.gal.u) * fact
+    s = np.abs(thismap.gal.i/thismap.gal.di) < 2
+    d[s] = 0
+    plotmap(d,thismap.gal.wcs,title='PolAmp'+r'$_{\rm GAL}$'+' [mJy/arcsec2]', vmin=0, vmax=1, fig=fig,ax=ax[0]) 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    gamp = scuba2tool.polamp(a.gq, a.gu)
-    gang = scuba2tool.polang(a.gq, a.gu)
+    d = scuba2tool.polang(thismap.gal.q,thismap.gal.u)
+    d[s] = 0
+    plotmap(d,thismap.gal.wcs,title='PolAngle'+r'$_{\rm GAL}$'+' [deg]', vmin=30, vmax=180, fig=fig,ax=ax[1])
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    keys = [gamp*fcf, gang]
-    name = [r'PolAmpl$\rm_{GAL}$ [mJy/arcsec$^2$]', r'PolAngle$\rm_{GAL}$ [deg]']
-    maxv = [0.8, 180]
-
-    fig, ax = plt.subplots(figsize=(11, 4), ncols=len(keys))
-
-    for d in keys:
-        sigma = np.abs(a.i/a.di)
-        d[sigma < 2] = 0
-
-    for ii, d in enumerate(keys):
-        plotmap(a.c_glgb, d, bins=a.c_glgbbins, title=name[ii],
-                fig=fig, ax=ax[ii], vmax=maxv[ii], vmin=0)
+    d = scuba2tool.polfrac(thismap.gal.i,thismap.gal.q,thismap.gal.u)
+    d[s] = 0
+    plotmap(d,thismap.gal.wcs,title='PolFrac'+r'$_{\rm GAL}$'+' ', vmin=0, vmax=0.3, fig=fig,ax=ax[2])
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
     fig.tight_layout()
-
     fig.savefig(name_format+"_galpol.pdf")
     plt.clf()
     plt.close()
 
+    # IQU,Pol in subobs
 
-    # In[13]:
+    if len(thismap_sub)>0:
+        fig,ax = scuba2tool.wcs_subplots(thismap.wcs, ncols=6, nrows=len(thismap_sub))
 
+        for i,asub in enumerate(thismap_sub):
 
-    # keys = [a.i*fcf, a.q*fcf, a.u*fcf, amp*fcf, ang]
-    # name = [r'I$\rm_{FK5}$ [mJy/arcsec$^2$]', r'Q$\rm_{FK5}$ [mJy/arcsec$^2$]', r'U$\rm_{FK5}$ [mJy/arcsec$^2$]', r'PolAmpl$\rm_{FK5}$ [mJy/arcsec$^2$]', r'PolAngle$\rm_{FK5}$ [deg]']
-    # maxv = [0.8, 0.8, 0.8, 0.8, 180]
+            plotmap(asub.i*fact,asub.wcs,title='I'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=-0.2,vmax=4,fig=fig,ax=ax[i*6+0])
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+            plotmap(asub.q*fact,thismap.wcs,title='Q'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=-0.2,vmax=1,fig=fig,ax=ax[i*6+1])
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+            plotmap(asub.u*fact,asub.wcs,title='U'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=-1,vmax=0.2,fig=fig,ax=ax[i*6+2])
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    # fig, ax = plt.subplots(figsize=(6*len(keys), 4), ncols=len(keys))
+            d = scuba2tool.polamp(asub.q,asub.u) * fact
+            s = np.abs(asub.i/asub.di) < 2
+            d[s] = 0
+            plotmap(d,asub.wcs,title='PolAmp'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=0, vmax=1, fig=fig,ax=ax[i*6+3]) 
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+3],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+3],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    # for d in keys:
-    #     sigma = np.abs(a.i/a.di)
-    #     d[sigma < 2] = 0
+            d = scuba2tool.polang(asub.q,asub.u)
+            d[s] = 0
+            plotmap(d,asub.wcs,title='PolAngle'+r'$_{\rm FK5}$'+' [deg]'+f' (#{i})', vmin=30, vmax=180, fig=fig,ax=ax[i*6+4])
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+4],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+4],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    # for ii, d in enumerate(keys[:3]):
-    #     plotmap(a.c_radec, d, bins=a.c_radecbins, title=name[ii],
-    #             fig=fig, ax=ax[ii], vmax=np.nanmax(d)*0.2, vmin=np.nanmin(d)*0.2)
+            d = scuba2tool.polfrac(asub.i,asub.q,asub.u)
+            d[s] = 0
+            plotmap(d,asub.wcs,title='PolFrac'+r'$_{\rm FK5}$'+' '+f' (#{i})', vmin=0, vmax=0.3, fig=fig,ax=ax[i*6+5])
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+5],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+5],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    # for ii, d in enumerate(keys[3:]):
-    #     plotmap(a.c_radec, d, bins=a.c_radecbins, title=name[ii+3],
-    #             fig=fig, ax=ax[ii+3], vmax=maxv[ii+3])
+            pass
 
-    # for iax in ax:
-    #     draw_circle = plt.Circle(radeccent, r_signal,fill=False,color='white')
-    #     iax.add_artist(draw_circle)
-    #     draw_circle = plt.Circle(radeccent, 0.05,fill=False,color='white')
-    #     iax.add_artist(draw_circle)
-    #     draw_circle = plt.Circle(radeccent, 0.03,fill=False,color='white')
-    #     iax.add_artist(draw_circle)
-    #     iax.scatter([cra],[cdec],color='w',marker='x')
-
-    #     draw_circle = plt.Circle(radeccent_l, r_rms, fill=False, color='grey', ls='-', lw=3)
-    #     iax.add_artist(draw_circle)
-    #     draw_circle = plt.Circle(radeccent_u, r_rms, fill=False, color='grey', ls='-', lw=3)
-    #     iax.add_artist(draw_circle)
-    #     draw_circle = plt.Circle(radeccent_r, r_rms, fill=False, color='grey', ls='-', lw=3)
-    #     iax.add_artist(draw_circle)
-    #     draw_circle = plt.Circle(radeccent_b, r_rms, fill=False, color='grey', ls='-', lw=3)
-    #     iax.add_artist(draw_circle)
-
-    # fig.tight_layout()
-
-    # fig.savefig(name_format+"_pol_region.pdf")
-    # plt.clf()
-    # plt.close()
+        fig.tight_layout()
+        fig.savefig(name_format+"_subobs.pdf")
+        plt.clf()
+        plt.close()
 
 
-    # # In[14]:
+    # signal integration / aparture photometory
 
+    cx = cent.ra.deg #[deg]
+    cy = cent.dec.deg #[deg]
+    x = thismap.ra #[deg]
+    y = thismap.dec #[deg]
+    dist = np.sqrt((x-cx)**2 + (y-cy)**2)
+    distf = dist.flatten()
 
-    # keys = [a.i*fcf, a.q*fcf, a.u*fcf, amp*fcf, ang]
-    # name = [r'I$\rm_{FK5}$ [mJy/arcsec$^2$]', r'Q$\rm_{FK5}$ [mJy/arcsec$^2$]', r'U$\rm_{FK5}$ [mJy/arcsec$^2$]', r'PolAmpl$\rm_{FK5}$ [mJy/arcsec$^2$]', r'PolAngle$\rm_{FK5}$ [deg]']
-    # maxv = [0.8*0.1, 0.8*0.1, 0.8*0.1, 0.8*0.5, 180]
+    radius_list = 0.001*np.arange(1,100) #[deg]
+    area_list = np.array([np.pi*ir**2*3600**2 for ir in radius_list]) #[arcsec2]
+    #npix_list = np.array([len(np.where(distf<ir)[0]) for ir in radius_list])
+    #area_list = 4*4*npix_list #[arcsec2]
 
-    # fig, ax = plt.subplots(figsize=(6*len(keys), 4), ncols=len(keys))
-    # #ax = ax.flatten()
+    vals = thismap.i.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+    ret_i = np.array([np.mean(vals[distf<ir]) for ir in radius_list])*area_list # [Jy]
 
-    # for ii, d in enumerate(keys[:3]):
-    #     newd = scuba2tool.mask(d,a.astmask)
-    #     plotmap(a.c_radec, newd, bins=a.c_radecbins, title=name[ii]+' with astmask',
-    #             fig=fig, ax=ax[ii], vmax=np.nanmax(newd)*0.01, vmin=np.nanmin(newd)*0.01)
+    vals = thismap.q.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+    ret_q = np.array([np.mean(vals[distf<ir]) for ir in radius_list])*area_list # [Jy]
 
-    # for ii, d in enumerate(keys[3:]):
-    #     newd = scuba2tool.mask(d,a.astmask)
-    #     plotmap(a.c_radec, newd, bins=a.c_radecbins, title=name[ii+3]+' with astmask',
-    #             fig=fig, ax=ax[ii+3], vmax=maxv[ii+3])
+    vals = thismap.u.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+    ret_u = np.array([np.mean(vals[distf<ir]) for ir in radius_list])*area_list # [Jy]
 
-    # for iax in ax:
-    #     draw_circle = plt.Circle(radeccent, r_signal,fill=False,color='white')
-    #     iax.add_artist(draw_circle)
-    #     draw_circle = plt.Circle(radeccent, 0.05,fill=False,color='white')
-    #     iax.add_artist(draw_circle)
-    #     draw_circle = plt.Circle(radeccent, 0.03,fill=False,color='white')
-    #     iax.add_artist(draw_circle)
-    #     iax.scatter([cra],[cdec],color='w',marker='x')
+    ret_sub_i = [None]*len(thismap_sub)
+    ret_sub_q = [None]*len(thismap_sub)
+    ret_sub_u = [None]*len(thismap_sub)
 
-    #     draw_circle = plt.Circle(radeccent_l, r_rms, fill=False, color='grey', ls='-', lw=3)
-    #     iax.add_artist(draw_circle)
-    #     draw_circle = plt.Circle(radeccent_u, r_rms, fill=False, color='grey', ls='-', lw=3)
-    #     iax.add_artist(draw_circle)
-    #     draw_circle = plt.Circle(radeccent_r, r_rms, fill=False, color='grey', ls='-', lw=3)
-    #     iax.add_artist(draw_circle)
-    #     draw_circle = plt.Circle(radeccent_b, r_rms, fill=False, color='grey', ls='-', lw=3)
-    #     iax.add_artist(draw_circle)
+    for i,asub in enumerate(thismap_sub):
+        vals = asub.i.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+        ret_sub_i[i] = np.array([np.mean(vals[distf<ir]) for ir in radius_list])*area_list # [Jy]
 
+        vals = asub.q.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+        ret_sub_q[i] = np.array([np.mean(vals[distf<ir]) for ir in radius_list])*area_list # [Jy]
 
-    # fig.tight_layout()
+        vals = asub.u.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+        ret_sub_u[i] = np.array([np.mean(vals[distf<ir]) for ir in radius_list])*area_list # [Jy]
 
+        pass
 
-    # fig.savefig(name_format+"_pol_region2.pdf")
-    # plt.clf()
-    # plt.close()
+    # aperture photometry
+    r0 = 0.07
+    r1 = 0.08
+    ss = (distf>=r0) & (distf<r1)
+    area = (np.pi*(r1**2-r0**2)*3600**2) # [arcsec2]
 
-
-    # # In[15]:
-
-    # ss = ~np.isnan(a.astmask) & ~np.isnan(a.pcamask)
-    # def _get(i,j,k):
-    #     if not ss[k]:
-    #         return np.nan
-    #     if i==0 and i==j:
-    #         return np.nan
-    #     return i-j
-    # #d = np.array([int(i)-int(j) if ss[k] else np.nan for k,(i,j) in enumerate(zip(a.astmask,a.pcamask))])
-    # d = np.array([_get(i,j,k) for k,(i,j) in enumerate(zip(a.astmask,a.pcamask))])
-    # #d[np.isnan(a.astmask) & np.isnan(a.pcamask)]
-    # fig,ax = plt.subplots(figsize=(12,4),ncols=2)
-    # ax[0].plot(d,'o')
-    # ax[0].set_ylabel("astmask - pcamask")
-    # ax[0].set_xlabel("number")
-    # plotmap(a.c_radec, d, bins=a.c_radecbins, title='astmask - pcamask',fig=fig,ax=ax[1],vmax=1,vmin=-1,count=3)
-    # ax[1].set_facecolor('grey')
-
-    # fig.savefig(name_format+"_mask.pdf")
-    # plt.clf()
-    # plt.close()
-
-    keys = [a.iauto*fcf, a.i*fcf, a.iauto*fcf, a.i*fcf]
-    name = [r'(A) I$\rm_{FK5,auto}$ [mJy/arcsec$^2$]', r'(B) I$\rm_{FK5}$ [mJy/arcsec$^2$]', r'(C) I$\rm_{FK5,auto,ASTmasked}$ [mJy/arcsec$^2$]', r'(D) I$\rm_{FK5,ASTmasked}$ [mJy/arcsec$^2$]']
-
-    fig, ax = plt.subplots(figsize=(6*len(keys)+6, 8), ncols=len(keys)+1, nrows=2)
+    fig,ax = plt.subplots(figsize=(18,5),ncols=3,sharey=True,sharex=True)
     ax = ax.flatten()
 
-    for ii, d in enumerate(keys):
-        if ii>1:
-            newd = scuba2tool.mask(d,a.astmask)
-            plotmap(a.radec, newd, bins=a.radecbins, title=name[ii],
-                    fig=fig, ax=ax[ii], vmax=0.2, vmin=-0.2)
-        else:
-            newd = d
-            plotmap(a.radec, newd, bins=a.radecbins, title=name[ii],
-                    fig=fig, ax=ax[ii], vmax=0.2, vmin=-0.2)
+    vals = thismap.i.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+    noise_i = np.mean(vals[ss]) # [Jy/arcsec2]
+    noiserms_i = np.std(vals[ss]) # [Jy/arcsec2]
+    ax[0].hist(vals[ss]*1000,bins=np.arange(-0.4,0.4,0.01),color='r',alpha=0.7)
 
-    ss = ~np.isnan(a.astmask) & ~np.isnan(a.pcamask)
-    def _get(i,j,k):
-        if not ss[k]:
-            return np.nan
-        if i==0 and i==j:
-            return np.nan
-        return i-j
-    d = np.array([_get(i,j,k) for k,(i,j) in enumerate(zip(a.astmask,a.pcamask))])
-    plotmap(a.radec, d, bins=a.radecbins, title='(E) astmask - pcamask',fig=fig,ax=ax[4],vmax=1,vmin=-1,count=3)
+    vals = thismap.q.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+    noise_q = np.mean(vals[ss]) # [Jy/arcsec2]
+    noiserms_q = np.std(vals[ss]) # [Jy/arcsec2]
+    ax[1].hist(vals[ss]*1000,bins=np.arange(-0.4,0.4,0.01),color='b',alpha=0.7)
 
-    name = ["(F) ", "(G) ", "(H) ", "(I) ","(J) "]
-    for ii,s in enumerate(asub):
-        newd = s.i*fcf
-        plotmap(s.c_radec, newd, bins=s.c_radecbins, title=name[ii]+r'I$\rm_{FK5}$ #'+f'{ii}'+r' [mJy/arcsec$^2$]',
-                fig=fig, ax=ax[ii+5], vmax=0.2, vmin=-0.2)
+    vals = thismap.u.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+    noise_u = np.mean(vals[ss]) # [Jy/arcsec2]
+    noiserms_u = np.std(vals[ss]) # [Jy/arcsec2]
+    ax[2].hist(vals[ss]*1000,bins=np.arange(-0.4,0.4,0.01),color='k',alpha=0.7)
 
-    for ii,iax in enumerate(ax):
-        if ii == 4:
-            continue
+    ret_i_kai = ret_i - noise_i * area_list
+    ret_q_kai = ret_q - noise_q * area_list
+    ret_u_kai = ret_u - noise_u * area_list
 
-        draw_circle = plt.Circle(radeccent, r_signal,fill=False,color='white')
-        iax.add_artist(draw_circle)
-        draw_circle = plt.Circle(radeccent, 0.05,fill=False,color='white')
-        iax.add_artist(draw_circle)
+    ax[0].set_title(f"noise I = {noise_i*1000:+9.6f} ± {noiserms_i*1000:5.2g} mJy/arcsec2")
+    ax[1].set_title(f"noise Q = {noise_q*1000:+8.2g}  ± {noiserms_q*1000:5.2g} mJy/arcsec2")
+    ax[2].set_title(f"noise U = {noise_u*1000:+8.2g}  ± {noiserms_u*1000:5.2g} mJy/arcsec2")
 
-        iax.scatter([cra],[cdec],color='k',marker='x')
+    for ia in ax:
+        ia.set_xlabel("noise [mJy/arcsec2]")
 
-        draw_circle = plt.Circle(radeccent_l, r_rms, fill=False, color='grey', ls='-', lw=2)
-        iax.add_artist(draw_circle)
-        draw_circle = plt.Circle(radeccent_u, r_rms, fill=False, color='grey', ls='-', lw=2)
-        iax.add_artist(draw_circle)
-        draw_circle = plt.Circle(radeccent_r, r_rms, fill=False, color='grey', ls='-', lw=2)
-        iax.add_artist(draw_circle)
-        draw_circle = plt.Circle(radeccent_b, r_rms, fill=False, color='grey', ls='-', lw=2)
-        iax.add_artist(draw_circle)
+    ax[0].set_ylabel("entries")
 
     fig.tight_layout()
-
-    fig.savefig(name_format+"_miscI.pdf")
+    fig.savefig(name_format+"_noise.pdf")
     plt.clf()
     plt.close()
 
-    # In[16]:
+    ret_sub_i_kai = [None]*len(thismap_sub)
+    ret_sub_q_kai = [None]*len(thismap_sub)
+    ret_sub_u_kai = [None]*len(thismap_sub)
 
-    with open(name_format+"_tables.tex", mode='w') as f:
-        f.write('\n\n')
+    noise_sub_i = [None]*len(thismap_sub)
+    noise_sub_q = [None]*len(thismap_sub)
+    noise_sub_u = [None]*len(thismap_sub)
 
-    # In[17]:
+    noiserms_sub_i = [None]*len(thismap_sub)
+    noiserms_sub_q = [None]*len(thismap_sub)
+    noiserms_sub_u = [None]*len(thismap_sub)
 
-    # colnames = ['I','Q','U','PolAmpl','PolAngle','PolFrac','N','R']
+    if len(thismap_sub)>0:
+        fig,ax = plt.subplots(figsize=(18,5*len(thismap_sub)),ncols=3,nrows=len(thismap_sub),sharey=True,sharex=True)
+        ax = ax.flatten()
 
-    # df = pd.DataFrame(index=[],columns=colnames)
+        for i,asub in enumerate(thismap_sub):
+            vals = asub.i.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+            noise_sub_i[i] = np.mean(vals[ss]) # [Jy/arcsec2]
+            noiserms_sub_i[i] = np.std(vals[ss]) # [Jy/arcsec2]
+            ax[i*3+0].hist(vals[ss]*1000,bins=np.arange(-0.4,0.4,0.01),color='r',alpha=0.7)
 
-    # fig, ax = plt.subplots(ncols=7, figsize=(28, 4))
+            vals = asub.q.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+            noise_sub_q[i] = np.mean(vals[ss]) # [Jy/arcsec2]
+            noiserms_sub_q[i] = np.std(vals[ss]) # [Jy/arcsec2]
+            ax[i*3+1].hist(vals[ss]*1000,bins=np.arange(-0.4,0.4,0.01),color='b',alpha=0.7)
 
-    # imask = scuba2tool.mask(a.i,a.astmask)
-    # qmask = scuba2tool.mask(a.q,a.astmask)
-    # umask = scuba2tool.mask(a.u,a.astmask)
+            vals = asub.u.flatten() * fact /1000 # [pW] --> [Jy/arcsec2]
+            noise_sub_u[i] = np.mean(vals[ss]) # [Jy/arcsec2]
+            noiserms_sub_u[i] = np.std(vals[ss]) # [Jy/arcsec2]
+            ax[i*3+2].hist(vals[ss]*1000,bins=np.arange(-0.4,0.4,0.01),color='k',alpha=0.7)
 
-    # avg = [np.nan]*8
+            ret_sub_i_kai[i] = ret_sub_i[i] - noise_sub_i[i] * area_list
+            ret_sub_q_kai[i] = ret_sub_q[i] - noise_sub_q[i] * area_list
+            ret_sub_u_kai[i] = ret_sub_u[i] - noise_sub_u[i] * area_list
 
-    # l = scuba2integral.calc_mean(imask,qmask,umask, a.c_radec, radeccent_l, r_rms, fcf=fcf,
-    #                              fig=fig,ax=ax,c='b',un="[mJy/arcsec2]", do_print=False,label='L')
-    # record = pd.Series(l, index=df.columns, name='L')
-    # df = df.append(record)
-    # avg = np.nanmean((avg,l),axis=0)
+            ax[i*3+0].set_title(f"noise I = {noise_sub_i[i] *1000:+8.2g} ± {noiserms_sub_i[i] *1000:5.2g} mJy/arcsec2 (#{i})")
+            ax[i*3+1].set_title(f"noise Q = {noise_sub_q[i] *1000:+8.2g}  ± {noiserms_sub_q[i] *1000:5.2g} mJy/arcsec2 (#{i})")
+            ax[i*3+2].set_title(f"noise U = {noise_sub_u[i] *1000:+8.2g}  ± {noiserms_sub_u[i] *1000:5.2g} mJy/arcsec2 (#{i})")
+            ax[i*3+0].set_ylabel("entries")
 
-    # l = scuba2integral.calc_mean(imask,qmask,umask, a.c_radec, radeccent_r, r_rms, fcf=fcf,
-    #                              fig=fig,ax=ax,c='cyan',un="[mJy/arcsec2]", do_print=False,label='R')
-    # record = pd.Series(l, index=df.columns, name='R')
-    # df = df.append(record)
-    # avg = np.nanmean((avg,l),axis=0)
+        ax[(len(thismap_sub)-1)*3+0].set_xlabel("noise [mJy/arcsec2]")
+        ax[(len(thismap_sub)-1)*3+1].set_xlabel("noise [mJy/arcsec2]")
+        ax[(len(thismap_sub)-1)*3+2].set_xlabel("noise [mJy/arcsec2]")
 
-    # l = scuba2integral.calc_mean(imask,qmask,umask, a.c_radec, radeccent_u, r_rms, fcf=fcf,
-    #                              fig=fig,ax=ax,c='r',un="[mJy/arcsec2]", do_print=False,label='U')
-    # record = pd.Series(l, index=df.columns, name='U')
-    # df = df.append(record)
-    # avg = np.nanmean((avg,l),axis=0)
+        fig.tight_layout()
+        fig.savefig(name_format+"_noise_subobs.pdf")
+        plt.clf()
+        plt.close()
 
-    # l = scuba2integral.calc_mean(imask,qmask,umask, a.c_radec, radeccent_b, r_rms, fcf=fcf,
-    #                              fig=fig,ax=ax,c='orange',un="[mJy/arcsec2]", do_print=False,label='B')
-    # record = pd.Series(l, index=df.columns, name='B')
-    # df = df.append(record)
-    # avg = np.nanmean((avg,l),axis=0)
+    fig,ax = plt.subplots(figsize=(18,8),ncols=3,nrows=2)
+    ax = ax.flatten()
 
-    # #record = pd.Series(avg, index=df.columns, name='ALL')
-    # df = df.append(record)
+    ax[0].plot(radius_list*3600,ret_i, 'o:',c='orange',alpha=0.5)
+    ax[1].plot(radius_list*3600,ret_q, 'o:',c='orange',alpha=0.5)
+    ax[2].plot(radius_list*3600,ret_u, 'o:',c='orange',alpha=0.5)
+    ax[3].plot(radius_list*3600,scuba2tool.polamp(ret_q,ret_u), 'o:',c='orange',alpha=0.5)
+    ax[4].plot(radius_list*3600,scuba2tool.polang(ret_q,ret_u), 'o:',c='orange',alpha=0.5)
+    ax[5].plot(radius_list*3600,scuba2tool.polfrac(ret_i,ret_q,ret_u), 'o:',c='orange',alpha=0.5)
 
-    # for iax in ax:
-    #     iax.axvline(r_rms*3600,ls=':',c='k')
+    ax[0].plot(radius_list*3600,ret_i_kai, 'bo:')
+    ax[0].set_ylabel("Integrated I [Jy]")
+    ax[1].plot(radius_list*3600,ret_q_kai, 'bo:')
+    ax[1].set_ylabel("Integrated Q [Jy]")
+    ax[2].plot(radius_list*3600,ret_u_kai, 'bo:')
+    ax[2].set_ylabel("Integrated U [Jy]")
+    ax[3].plot(radius_list*3600,scuba2tool.polamp(ret_q_kai,ret_u_kai), 'bo:')
+    ax[3].set_ylabel("Integrated Ampl"+r"$_{\rm pol}$ [Jy]")
+    ax[4].plot(radius_list*3600,scuba2tool.polang(ret_q_kai,ret_u_kai), 'bo:')
+    ax[4].set_ylabel("Integrated Angle"+r"$_{\rm pol}$ [deg]")
+    ax[5].plot(radius_list*3600,scuba2tool.polfrac(ret_i_kai,ret_q_kai,ret_u_kai), 'bo:')
+    ax[5].set_ylabel("Integrated Frac"+r"$_{\rm pol}$")
 
-    # fig.savefig(name_format+"_integ_mean.pdf")
-    # plt.clf()
-    # plt.close()
+    for iax in ax:
+        iax.set_xlabel("Integrated radius [arcsec]")
 
-    # for ii,s in enumerate(asub):
-    #     fig, ax = plt.subplots(ncols=7, figsize=(28, 4))
-    #     avg = [np.nan]*8
-    #     imask = scuba2tool.mask(s.i,s.astmask)
-    #     qmask = scuba2tool.mask(s.q,s.astmask)
-    #     umask = scuba2tool.mask(s.u,s.astmask)
+    fig.tight_layout()
+    fig.savefig(name_format+"_integrated.pdf")
+    plt.clf()
+    plt.close()
 
-    #     l = scuba2integral.calc_mean(imask,qmask,umask, a.c_radec, radeccent_l, r_rms, fcf=fcf,
-    #                                  fig=fig,ax=ax,c='b',un="[mJy/arcsec2]", do_print=False,label='L')
-    #     record = pd.Series(l, index=df.columns, name=f'L_{ii}')
-    #     df = df.append(record)
-    #     avg = np.nanmean((avg,l),axis=0)
+    fig,ax = plt.subplots(figsize=(18,8),ncols=3,nrows=2, sharex=True)
+    ax = ax.flatten()
 
-    #     l = scuba2integral.calc_mean(imask,qmask,umask, a.c_radec, radeccent_r, r_rms, fcf=fcf,
-    #                                  fig=fig,ax=ax,c='cyan',un="[mJy/arcsec2]", do_print=False,label='R')
-    #     record = pd.Series(l, index=df.columns, name=f'R_{ii}')
-    #     df = df.append(record)
-    #     avg = np.nanmean((avg,l),axis=0)
-
-    #     l = scuba2integral.calc_mean(imask,qmask,umask, a.c_radec, radeccent_u, r_rms, fcf=fcf,
-    #                                  fig=fig,ax=ax,c='r',un="[mJy/arcsec2]", do_print=False,label='U')
-    #     record = pd.Series(l, index=df.columns, name=f'U_{ii}')
-    #     df = df.append(record)
-    #     avg = np.nanmean((avg,l),axis=0)
-
-    #     l = scuba2integral.calc_mean(imask,qmask,umask, a.c_radec, radeccent_b, r_rms, fcf=fcf,
-    #                                  fig=fig,ax=ax,c='orange',un="[mJy/arcsec2]", do_print=False,label='B')
-    #     record = pd.Series(l, index=df.columns, name=f'B_{ii}')
-    #     df = df.append(record)
-    #     avg = np.nanmean((avg,l),axis=0)
-
-    #     #record = pd.Series(avg, index=df.columns, name=f'ALL_{ii}')
-    #     df = df.append(record)
-
-    #     pass
-
-    # ltx_str = df.to_latex(float_format="%.4g")
-
-    # print("============ blank region / mean ============")
-    # print(df)
-
-    # with open(name_format+"_tables.tex", mode='a') as f:
-    #     f.write(ltx_str+'\n\n')
+    for i,asub in enumerate(thismap_sub):
+        ax[0].plot(radius_list*3600,ret_sub_i_kai[i], 'o:',label=f'#{i}')
+        ax[1].plot(radius_list*3600,ret_sub_q_kai[i], 'o:',label=f'#{i}')
+        ax[2].plot(radius_list*3600,ret_sub_u_kai[i], 'o:',label=f'#{i}')
+        ax[3].plot(radius_list*3600,scuba2tool.polamp(ret_sub_q_kai[i],ret_sub_u_kai[i]), 'o:',label=f'#{i}')
+        ax[4].plot(radius_list*3600,scuba2tool.polang(ret_sub_q_kai[i],ret_sub_u_kai[i]), 'o:',label=f'#{i}')
+        ax[5].plot(radius_list*3600,scuba2tool.polfrac(ret_sub_i_kai[i],ret_sub_q_kai[i],ret_sub_u_kai[i]), 'o:',label=f'#{i}')
 
 
-    # In[18]:
+    ax[0].plot(radius_list*3600,ret_i_kai, 'ko:',label='all')
+    ax[0].set_ylabel("Integrated I [Jy]")
+    ax[1].plot(radius_list*3600,ret_q_kai, 'ko:',label='all')
+    ax[1].set_ylabel("Integrated Q [Jy]")
+    ax[2].plot(radius_list*3600,ret_u_kai, 'ko:',label='all')
+    ax[2].set_ylabel("Integrated U [Jy]")
+    ax[3].plot(radius_list*3600,scuba2tool.polamp(ret_q_kai,ret_u_kai), 'ko:',label='all')
+    ax[3].set_ylabel("Integrated Ampl"+r"$_{\rm pol}$ [Jy]")
+    ax[4].plot(radius_list*3600,scuba2tool.polang(ret_q_kai,ret_u_kai), 'ko:',label='all')
+    ax[4].set_ylabel("Integrated Angle"+r"$_{\rm pol}$ [deg]")
+    ax[5].plot(radius_list*3600,scuba2tool.polfrac(ret_i_kai,ret_q_kai,ret_u_kai), 'ko:',label='all')
+    ax[5].set_ylabel("Integrated Frac"+r"$_{\rm pol}$")
 
-    # colnames = ['I','Q','U','PolAmpl','PolAngle','PolFrac','N','R']
+    for iax in ax[3:6]:
+        iax.set_xlabel("Integrated radius [arcsec]")
 
-    # df = pd.DataFrame(index=[],columns=colnames)
+    for iax in ax:
+        iax.legend()
 
-    # fig, ax = plt.subplots(ncols=7, figsize=(28, 4))
-
-    # imask = scuba2tool.mask(a.i,a.astmask)
-    # qmask = scuba2tool.mask(a.q,a.astmask)
-    # umask = scuba2tool.mask(a.u,a.astmask)
-
-    # l = scuba2integral.calc_rms(imask,qmask,umask, a.c_radec, radeccent_l, r_rms, dist1=r_rms*2, fcf=fcf,
-    #                             fig=fig,ax=ax,c='b',un="[mJy/arcsec2]", do_print=False,label='L')
-    # record = pd.Series(l, index=df.columns, name='L')
-    # df = df.append(record)
-
-    # l = scuba2integral.calc_rms(imask,qmask,umask, a.c_radec, radeccent_r, r_rms, dist1=r_rms*2, fcf=fcf,
-    #                              fig=fig,ax=ax,c='cyan',un="[mJy/arcsec2]", do_print=False,label='R')
-    # record = pd.Series(l, index=df.columns, name='R')
-    # df = df.append(record)
-
-    # l = scuba2integral.calc_rms(imask,qmask,umask, a.c_radec, radeccent_u, r_rms, dist1=r_rms*2, fcf=fcf,
-    #                              fig=fig,ax=ax,c='r',un="[mJy/arcsec2]", do_print=False,label='U')
-    # record = pd.Series(l, index=df.columns, name='U')
-    # df = df.append(record)
-
-    # l = scuba2integral.calc_rms(imask,qmask,umask, a.c_radec, radeccent_b, r_rms, dist1=r_rms*2, fcf=fcf,
-    #                              fig=fig,ax=ax,c='orange',un="[mJy/arcsec2]", do_print=False,label='B')
-    # record = pd.Series(l, index=df.columns, name='B')
-    # df = df.append(record)
-
-    # for iax in ax:
-    #     iax.axvline(r_rms*3600,ls=':',c='k')
-
-    # fig.savefig(name_format+"_integ_rms.pdf")
-    # plt.clf()
-    # plt.close()
-
-    # for ii,s in enumerate(asub):
-    #     fig, ax = plt.subplots(ncols=7, figsize=(28, 4))
-    #     imask = scuba2tool.mask(s.i,s.astmask)
-    #     qmask = scuba2tool.mask(s.q,s.astmask)
-    #     umask = scuba2tool.mask(s.u,s.astmask)
-
-    #     l = scuba2integral.calc_rms(imask,qmask,umask, a.c_radec, radeccent_l, r_rms, fcf=fcf,
-    #                                  fig=fig,ax=ax,c='b',un="[mJy/arcsec2]", do_print=False,label='L')
-    #     record = pd.Series(l, index=df.columns, name=f'L_{ii}')
-    #     df = df.append(record)
-
-    #     l = scuba2integral.calc_rms(imask,qmask,umask, a.c_radec, radeccent_r, r_rms, fcf=fcf,
-    #                                  fig=fig,ax=ax,c='cyan',un="[mJy/arcsec2]", do_print=False,label='R')
-    #     record = pd.Series(l, index=df.columns, name=f'R_{ii}')
-    #     df = df.append(record)
-
-    #     l = scuba2integral.calc_rms(imask,qmask,umask, a.c_radec, radeccent_u, r_rms, fcf=fcf,
-    #                                  fig=fig,ax=ax,c='r',un="[mJy/arcsec2]", do_print=False,label='U')
-    #     record = pd.Series(l, index=df.columns, name=f'U_{ii}')
-    #     df = df.append(record)
-
-    #     l = scuba2integral.calc_rms(imask,qmask,umask, a.c_radec, radeccent_b, r_rms, fcf=fcf,
-    #                                  fig=fig,ax=ax,c='orange',un="[mJy/arcsec2]", do_print=False,label='B')
-    #     record = pd.Series(l, index=df.columns, name=f'B_{ii}')
-    #     df = df.append(record)
-
-    #     pass
-
-    # ltx_str = df.to_latex(float_format="%.4g")
-
-    # print("============ blank region / rms  ============")
-    # print(df)
-
-    # with open(name_format+"_tables.tex", mode='a') as f:
-    #     f.write(ltx_str+'\n\n')
+    fig.tight_layout()
+    fig.savefig(name_format+"_integrated_subobs.pdf")
+    plt.clf()
+    plt.close()
 
 
-    colnames = ['$I$','$Q$','$U$','$I_p$','$N$','$R$']
+    fig,ax = scuba2tool.wcs_subplots(thismap.wcs,ncols=4)
+    if thismap.astmask is not None: 
+        v = thismap.i.copy()*fact
+        v[~np.isnan(thismap.astmask)] = np.nan
+        plotmap(v, thismap.wcs, fig=fig,ax=ax[0], vmin=-0.2, vmax=0.2, title='ASTmasked intensity '+r'[Jy/$\rm arcsec^2$]')
+        v = thismap.i.copy()*fact
+        v[np.isnan(thismap.astmask)] = np.nan
+        plotmap(v,thismap.wcs, fig=fig,ax=ax[1], vmin=-0.2, vmax=0.2, title='ASTmasked intensity '+r'[Jy/$\rm arcsec^2$]')
+    if thismap.pcamask is not None:
+        v = thismap.i.copy()*fact
+        v[~np.isnan(thismap.pcamask)] = np.nan
+        plotmap(v, thismap.wcs, fig=fig,ax=ax[2], vmin=-0.2, vmax=0.2, title='PCAmasked intensity '+r'[Jy/$\rm arcsec^2$]')
+        v = thismap.i.copy()*fact
+        v[np.isnan(thismap.pcamask)] = np.nan
+        plotmap(v,thismap.wcs, fig=fig,ax=ax[3], vmin=-0.2, vmax=0.2, title='PCAmasked intensity '+r'[Jy/$\rm arcsec^2$]')
+    fig.tight_layout()
+    fig.savefig(name_format+"_mask.pdf")
+    plt.clf()
+    plt.close()
 
+    ff = open(name_format+'_latex.tex', 'w')
+    ff = open(name_format+'_latex.tex', 'a')
+
+    colnames = ['$I$ [Jy]','$Q$ [Jy]','$U$ [Jy]','$I_p$ [Jy]','$\psi_p$ [deg]', '$p$']
     df = pd.DataFrame(index=[],columns=colnames)
 
-    fig, ax = plt.subplots(ncols=5, figsize=(20, 4))
+    ind = np.argmin(np.abs(radius_list-0.08))
 
-    imask = scuba2tool.mask(a.i,a.astmask)
-    qmask = scuba2tool.mask(a.q,a.astmask)
-    umask = scuba2tool.mask(a.u,a.astmask)
+    pamp = scuba2tool.polamp(ret_q_kai,ret_u_kai)
+    pang = scuba2tool.polang(ret_q_kai,ret_u_kai)
+    pfrc = scuba2tool.polfrac(ret_i_kai,ret_q_kai,ret_u_kai)
+    v = [ret_i_kai[ind],ret_q_kai[ind],ret_u_kai[ind],
+         pamp[ind], pang[ind], pfrc[ind]]
 
-    l = scuba2integral.calc_noise(imask,qmask,umask, a.c_radec, radeccent_l, r_rms, dist1=r_rms*2, fcf=fcf,
-                                  fig=fig,ax=ax,c='b',un="[mJy/arcsec2]", do_print=False,label='L')
-    record = pd.Series(l, index=df.columns, name='$L$')
+    record = pd.Series(v, index=df.columns, name='all')
     df = df.append(record)
 
-    l = scuba2integral.calc_noise(imask,qmask,umask, a.c_radec, radeccent_r, r_rms, dist1=r_rms*2, fcf=fcf,
-                                 fig=fig,ax=ax,c='cyan',un="[mJy/arcsec2]", do_print=False,label='R')
-    record = pd.Series(l, index=df.columns, name='$R$')
-    df = df.append(record)
+    for i,asub in enumerate(thismap_sub):
+        pamp = scuba2tool.polamp(ret_sub_q_kai[i],ret_sub_u_kai[i])
+        pang = scuba2tool.polang(ret_sub_q_kai[i],ret_sub_u_kai[i])
+        pfrc = scuba2tool.polfrac(ret_sub_i_kai[i],ret_sub_q_kai[i],ret_sub_u_kai[i])
+        v = [ret_sub_i_kai[i][ind],ret_sub_q_kai[i][ind],ret_sub_u_kai[i][ind],
+             pamp[ind], pang[ind], pfrc[ind]]
 
-    l = scuba2integral.calc_noise(imask,qmask,umask, a.c_radec, radeccent_u, r_rms, dist1=r_rms*2, fcf=fcf,
-                                 fig=fig,ax=ax,c='r',un="[mJy/arcsec2]", do_print=False,label='U')
-    record = pd.Series(l, index=df.columns, name='$U$')
-    df = df.append(record)
-
-    l = scuba2integral.calc_noise(imask,qmask,umask, a.c_radec, radeccent_b, r_rms, dist1=r_rms*2, fcf=fcf,
-                                 fig=fig,ax=ax,c='orange',un="[mJy/arcsec2]", do_print=False,label='B')
-    record = pd.Series(l, index=df.columns, name='$B$')
-    df = df.append(record)
-
-    for iax in ax:
-        iax.axvline(r_rms*3600,ls=':',c='k')
-
-    fig.savefig(name_format+"_integ_rms.pdf")
-    plt.clf()
-    plt.close()
-
-    for ii,s in enumerate(asub):
-        fig, ax = plt.subplots(ncols=5, figsize=(20, 4))
-        imask = scuba2tool.mask(s.i,s.astmask)
-        qmask = scuba2tool.mask(s.q,s.astmask)
-        umask = scuba2tool.mask(s.u,s.astmask)
-
-        l = scuba2integral.calc_noise(imask,qmask,umask, s.c_radec, radeccent_l, r_rms, fcf=fcf,
-                                      fig=fig,ax=ax,c='b',un="[mJy/arcsec2]", do_print=False,label='L')
-        record = pd.Series(l, index=df.columns, name=f'$L_{ii}$')
+        record = pd.Series(v, index=df.columns, name=f'#{i}')
         df = df.append(record)
 
-        l = scuba2integral.calc_noise(imask,qmask,umask, s.c_radec, radeccent_r, r_rms, fcf=fcf,
-                                      fig=fig,ax=ax,c='cyan',un="[mJy/arcsec2]", do_print=False,label='R')
-        record = pd.Series(l, index=df.columns, name=f'$R_{ii}$')
-        df = df.append(record)
+    print("\\begin{tabular}{crrrrrrr}",file=ff)
+    print("\\toprule",file=ff)
+    print(' ', end=' & ',file=ff)
+    for x in df.columns.values:
+        if x == colnames[-1]:
+            estr = ""
+        else:
+            estr = " & "
+        print(f'{x}', end=estr,file=ff)
+    print(" \\\\",file=ff)
+    print("\\midrule",file=ff)
+    for x,y in df.T.items():
+        x = x.replace("#","\\#")
+        print(f'{x}', end=" & ",file=ff)
+        for k,v in y.items():
+            if k == colnames[-1]:
+                estr = ""
+            else:
+                estr = " & "
+            print(f'{v:.4g}', end=estr,file=ff)
+        print(" \\\\",file=ff)
+    print("\\bottomrule",file=ff)
+    print("\\end{tabular}",file=ff)
+    print("\\label{tab:"+name_format+"_integ}",file=ff)
 
-        l = scuba2integral.calc_noise(imask,qmask,umask, s.c_radec, radeccent_u, r_rms, fcf=fcf,
-                                      fig=fig,ax=ax,c='r',un="[mJy/arcsec2]", do_print=False,label='U')
-        record = pd.Series(l, index=df.columns, name=f'$U_{ii}$')
-        df = df.append(record)
+    print('',file=ff)
+    print('',file=ff)
+    print('',file=ff)
 
-        l = scuba2integral.calc_noise(imask,qmask,umask, s.c_radec, radeccent_b, r_rms, fcf=fcf,
-                                      fig=fig,ax=ax,c='orange',un="[mJy/arcsec2]", do_print=False,label='B')
-        record = pd.Series(l, index=df.columns, name=f'$B_{ii}$')
-        df = df.append(record)
-
-        pass
-
-    ltx_str = df.to_latex(float_format="%.4g")
-
-    print("============ blank region / rms  ============")
-    print(df)
-
-    with open(name_format+"_tables.tex", mode='a') as f:
-        f.write(ltx_str+'\n\n')
-
-    # In[19]:
-
-
-    colnames = ['$I$','$Q$','$U$','$I_p$','$\psi_p$', '$p$', '$N$', '$R$']
+    colnames = ['$I_{\\rm noise}$ [mJy/$\\rm arcsec^2$]','$Q_{\\rm noise}$ [mJy/$\\rm arcsec^2$]','$U_{\\rm noise}$ [mJy/$\\rm arcsec^2$]']
     df = pd.DataFrame(index=[],columns=colnames)
 
-    fig, ax = plt.subplots(ncols=7, figsize=(28, 4))
+    v = [f'{noise_i*1000:+8.2g} $\\pm$ {noiserms_i*1000:5.2g}',
+         f'{noise_q*1000:+8.2g} $\\pm$ {noiserms_q*1000:5.2g}',
+         f'{noise_u*1000:+8.2g} $\\pm$ {noiserms_u*1000:5.2g}']
 
-    l = scuba2integral.calc_integration(*a.iqu, *a.diqu,
-                                        a.c_radec, radeccent, r_signal, r_signal*1.5,fcf=fcf,
-                                        fig=fig,ax=ax,c='b',un="[mJy/arcsec2]",do_print=False)
-    record = pd.Series(l, index=df.columns, name='FK5')
+    record = pd.Series(v, index=df.columns, name='all')
     df = df.append(record)
 
-    for iax in ax:
-        iax.axvline(r_signal*3600,ls=':',c='k')
+    for i,asub in enumerate(thismap_sub):
+        v = [f'{noise_sub_i[i]*1000:+8.2g} $\\pm$ {noiserms_sub_i[i]*1000:5.2g}',
+             f'{noise_sub_q[i]*1000:+8.2g} $\\pm$ {noiserms_sub_q[i]*1000:5.2g}',
+             f'{noise_sub_u[i]*1000:+8.2g} $\\pm$ {noiserms_sub_u[i]*1000:5.2g}']
 
-    fig.savefig(name_format+"_integ_radec.pdf")
-    plt.clf()
-    plt.close()
 
-    for ii,s in enumerate(asub):
-        fig, ax = plt.subplots(ncols=7, figsize=(28, 4))
-        l = scuba2integral.calc_integration(*s.iqu, *s.diqu,
-                                            s.c_radec, radeccent, r_signal, r_signal*1.5,fcf=fcf,
-                                            fig=fig,ax=ax,c='b',un="[mJy/arcsec2]",do_print=False)
-        record = pd.Series(l, index=df.columns, name=f'FK5$_{ii}$')
+        record = pd.Series(v, index=df.columns, name=f'#{i}')
         df = df.append(record)
-        pass
 
-    # In[20]:
-
-    fig, ax = plt.subplots(ncols=7, figsize=(28, 4))
-
-    l = scuba2integral.calc_integration(a.gi,a.gq,a.gu, a.gdi,a.gdq,a.gdu, 
-                                        a.c_glgb, glgbcent, r_signal, r_signal*1.5,fcf=fcf,
-                                        fig=fig,ax=ax,c='b',un="[mJy/arcsec2]",do_print=False)
-    record = pd.Series(l, index=df.columns, name='GAL')
-    df = df.append(record)
-
-    for iax in ax:
-        iax.axvline(r_signal*3600,ls=':',c='k')
-
-    fig.savefig(name_format+"_integ_gal.pdf")
-    plt.clf()
-    plt.close()
-
-    ltx_str = df.to_latex(float_format="%.6g")
-
-    print("============ signal region / integration  ============")
-    print(df)
-    print(f"INTEGRATED NPIX = {l[-2]}")
-
-    with open(name_format+"_tables.tex", mode='a') as f:
-        f.write(ltx_str+'\n\n')
+    print("\\begin{tabular}{crrr}",file=ff)
+    print("\\toprule",file=ff)
+    print(' ', end=' & ',file=ff)
+    for x in df.columns.values:
+        if x == colnames[-1]:
+            estr = ""
+        else:
+            estr = " & "
+        print(f'{x}', end=estr,file=ff)
+    print(" \\\\",file=ff)
+    print("\\midrule",file=ff)
+    for x,y in df.T.items():
+        x = x.replace("#","\\#")
+        print(f'{x}', end=" & ",file=ff)
+        for k,v in y.items():
+            if k == colnames[-1]:
+                estr = ""
+            else:
+                estr = " & "
+            print(f'{v}', end=estr,file=ff)
+        print(" \\\\",file=ff)
+    print("\\bottomrule",file=ff)
+    print("\\end{tabular}",file=ff)
+    print("\\label{tab:"+name_format+"_noise}",file=ff)
 
 
-    # In[ ]:
+    print('',file=ff)
+    print('',file=ff)
+    print('',file=ff)
+
+    fignames = [
+        name_format+"_iqu.pdf",
+        name_format+"_pol.pdf",
+        name_format+"_galiqu.pdf",
+        name_format+"_galpol.pdf",
+        name_format+"_subobs.pdf",
+        name_format+"_noise.pdf",
+        name_format+"_noise_subobs.pdf",
+        name_format+"_integrated.pdf",
+        name_format+"_integrated_subobs.pdf",
+        name_format+"_astmask.pdf",
+    ]
+
+    for x in fignames:
+        print("\\begin{figure}",file=ff)
+        print("\\centering",file=ff)
+        print("\\includegraphics[width=0.9\\textwidth]{"+x+"}",file=ff)
+        print("\\caption{}",file=ff)
+        print("\\label{fig:"+x.split("/")[-1].split(".")[0]+"}",file=ff)
+        print("\\end{figure}",file=ff)
+        print('',file=ff)
+
 
 if __name__ == '__main__':
 
     args = sys.argv
     if len(args)!=3:
         print("ERROR:: run.py [DIRECTORY] [NAME_FORMAT]")
-        pass
+        exit(-1)
 
     fdir = args[1] #"star21_850um_customPca/pca50/"
     name_format = args[2] #"pca50_850um"
     os.makedirs(name_format,exist_ok=True)
-    name_format = name_format + "/" + name_format
+    name_format2 = name_format + "/" + name_format
 
-    main(fdir,name_format)
+    #main(fdir,name_format2, do_subset=None, split_ext=name_format)
+    main(fdir,name_format2)#,fn_astmask='tauA/star21_850um_customPca/mask_nika.fits', fn_pcamask='tauA/star21_850um_customPca/mask_nika.fits')
 
