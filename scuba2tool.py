@@ -1,21 +1,11 @@
 #!python3
 
 import numpy as np
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import scipy
-from scipy import stats
-from scipy import signal
-import copy
-
 import astropy
 
 from astropy import units
-from astropy import convolution
 from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
-import reproject
 
 import wcstool
 import polcalc
