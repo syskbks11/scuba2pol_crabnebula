@@ -661,33 +661,25 @@ def get_scuba2map(fn, prior="", ext='', **kwargs):
             kwargs['umap'] = fits.open(fn+"uext"+ext+".fits")
         pass
     if 'iautomap' not in kwargs:
+        fname = fn+"/maps/"+prior+"_imap.fits" if prior != "" else fn+"iauto"+ext+".fits"
         try:
-            if prior != "":
-                kwargs['iautomap'] = fits.open(fn+"/maps/"+prior+"_imap.fits")
-            else:
-                kwargs['iautomap'] = fits.open(fn+"iauto"+ext+".fits")
+            kwargs['iautomap'] = fits.open(fname)
         except:
-            print("ERROR:: Cannot register iautomap.")
+            print(f"WARNING:: iautomap cannot be registered \"{fname}\" --> skipped.")
         pass
-    if 'astmask' not in kwargs:
-        try:
-            kwargs['astmask'] = fits.open(fn+"astmask"+ext+".fits")
-        except:
-            print("ERROR:: Cannot register astmaskmap.")
-        pass
-    else:
+
+    if 'astmask' not in kwargs and os.path.isfile(fn+"astmask"+ext+".fits"):
+        kwargs['astmask'] = fn+"astmask"+ext+".fits"
+    if 'astmask' in kwargs and kwargs['astmask'] is not None:
         try:
             if type(kwargs['astmask']) is str:
                 kwargs['astmask'] = fits.open(kwargs['astmask'])
         except:
             print(f"ERROR:: Cannot register astmaskmap of \"{kwargs['astmask']}\"")
-    if 'pcamask' not in kwargs:
-        try:
-            kwargs['pcamask'] = fits.open(fn+"pcamask"+ext+".fits")
-        except:
-            print("ERROR:: Cannot register pcamaskmap.")
-        pass
-    else:
+
+    if 'pcamask' not in kwargs and os.path.isfile(fn+"pcamask"+ext+".fits"):
+        kwargs['pcamask'] = fn+"pcamask"+ext+".fits"
+    if 'pcamask' in kwargs and kwargs['pcamask'] is not None:
         try:
             if type(kwargs['pcamask']) is str:
                 kwargs['pcamask'] = fits.open(kwargs['pcamask'])
@@ -702,7 +694,7 @@ class scuba2map():
     def __init__(self, imap, qmap, umap, fcf=1.,
                  iautomap=None, wcs_target=None, data_target=None,
                  noise_kind=None, pixsize=None, pisize_gal=None, filtsize=None,
-                 astmask=None, pcamask=None, set_zeronan=False):
+                 astmask=None, pcamask=None, nanvalue=None, set_zeronan=False):
         # fcf: conversion factor for input fits data arrays (recommendation is fcf to get arrays in [mJy/arcsec2])
 
         import warnings
@@ -715,6 +707,9 @@ class scuba2map():
         iwcs = WCS(imap[0].header)
         qwcs = WCS(qmap[0].header)
         uwcs = WCS(umap[0].header)
+
+        if set_zeronan and nanvalue is None:
+            nanvalue = 0
 
         if wcs_target is None:
             wcs_target = iwcs
@@ -734,21 +729,27 @@ class scuba2map():
         dec = reshape_wcs(coord.dec.deg, wcs_target)
 
         # noise calc
-        if noise_kind is None:
-            noise_kind = imap[1].header['EXTNAME'] if 'EXTNAME' in imap[1].header else 'std'
-        noise_kind = noise_kind.lower()
-        if 'var' in noise_kind or 'variance' in noise_kind:
-            di_raw = np.sqrt(imap[1].data)
-            dq_raw = np.sqrt(qmap[1].data)
-            du_raw = np.sqrt(umap[1].data)
-            pass
+        if len(imap)==1:
+            noise_kind = None
+            di_raw = np.zeros_like(imap[0].data)*np.nan
+            dq_raw = np.zeros_like(qmap[0].data)*np.nan
+            du_raw = np.zeros_like(umap[0].data)*np.nan
         else:
-            di_raw = imap[1].data
-            dq_raw = qmap[1].data
-            du_raw = umap[1].data
-            if not ('std' in noise_kind or 'deviation' in noise_kind):
-                print(f"WARNING:: Invalid noise_kind: \"{noise_kind}\". Treated as standard deviation.")
-            pass
+            if noise_kind is None:
+                noise_kind = imap[1].header['EXTNAME'] if 'EXTNAME' in imap[1].header else 'std'
+            noise_kind = noise_kind.lower()
+            if 'var' in noise_kind or 'variance' in noise_kind:
+                di_raw = np.sqrt(imap[1].data)
+                dq_raw = np.sqrt(qmap[1].data)
+                du_raw = np.sqrt(umap[1].data)
+                pass
+            else:
+                di_raw = imap[1].data
+                dq_raw = qmap[1].data
+                du_raw = umap[1].data
+                if not ('std' in noise_kind or 'deviation' in noise_kind):
+                    print(f"WARNING:: Invalid noise_kind: \"{noise_kind}\". Treated as standard deviation.")
+                pass
 
         # filtering
         if filtsize is not None:
@@ -782,13 +783,13 @@ class scuba2map():
             dq = wcs_reproject(dq_raw,qwcs,wcs_target)*fcf
             du = wcs_reproject(du_raw,uwcs,wcs_target)*fcf
 
-        if set_zeronan:
-            i[i==0] = np.nan
-            q[q==0] = np.nan
-            u[u==0] = np.nan
-            di[di==0] = np.nan
-            dq[dq==0] = np.nan
-            du[du==0] = np.nan
+        if nanvalue is not None:
+            i[i==nanvalue] = np.nan
+            q[q==nanvalue] = np.nan
+            u[u==nanvalue] = np.nan
+            di[di==nanvalue] = np.nan
+            dq[dq==nanvalue] = np.nan
+            du[du==nanvalue] = np.nan
 
         ## iauto map
         iauto  = None

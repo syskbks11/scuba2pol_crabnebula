@@ -1,52 +1,46 @@
 #!/usr/bin/env python3
 
-## Graphic libraries
-import matplotlib as mpl
-import matplotlib.pyplot as plt
+SUBSETS = ['20210807_00067_0002',
+           '20210807_00068_0002',
+           '20210818_00067_0002',
+           '20210825_00045_0002',
+           '20210825_00046_0002']
 
-## Scientific libraries
-import numpy as np
-import pandas as pd
-import scipy
-# from scipy import signal
-# from scipy.signal import savgol_filter
+def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS, mapsuffix=''):
+    ## Graphic libraries
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
 
-## Other libraries
-import glob
-import time
-import datetime
+    ## Scientific libraries
+    import numpy as np
+    import pandas as pd
+    import scipy
+    # from scipy import signal
+    # from scipy.signal import savgol_filter
 
-## System libraries
-import os
-import platform
-print(platform.node(), platform.platform())
-import sys
-print(sys.version, sys.platform, sys.executable)
+    ## Other libraries
+    import glob
+    import time
+    import datetime
 
-## Setting matplotlib
-mpl.rcParams.update({'font.size': 14})
-mpl.rcParams.update({'axes.facecolor':'w'})
-mpl.rcParams.update({'axes.edgecolor':'k'})
-mpl.rcParams.update({'figure.facecolor':'w'})
-mpl.rcParams.update({'figure.edgecolor':'w'})
-mpl.rcParams.update({'axes.grid':True})
-mpl.rcParams.update({'grid.linestyle':':'})
-mpl.rcParams.update({'figure.figsize':[12,9]})
 
-from astropy.io import fits
+    ## Setting matplotlib
+    mpl.rcParams.update({'font.size': 14})
+    mpl.rcParams.update({'axes.facecolor':'w'})
+    mpl.rcParams.update({'axes.edgecolor':'k'})
+    mpl.rcParams.update({'figure.facecolor':'w'})
+    mpl.rcParams.update({'figure.edgecolor':'w'})
+    mpl.rcParams.update({'axes.grid':True})
+    mpl.rcParams.update({'grid.linestyle':':'})
+    mpl.rcParams.update({'figure.figsize':[12,9]})
 
-from scuba2tool import plotmap
-import scuba2tool
+    from astropy.io import fits
 
-subset_priors = ['20210807_00067_0002',
-                 '20210807_00068_0002',
-                 '20210818_00067_0002',
-                 '20210825_00045_0002',
-                 '20210825_00046_0002']
-
-def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=subset_priors, split_ext=''):
+    from scuba2tool import plotmap
+    import scuba2tool
 
     # parameters
+
     delt_gal = 6/3600
     delt_fk5 = 5/3600
 
@@ -55,22 +49,21 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=subset_p
 
     r_signal = 0.09
     r_rms    = 0.03
+
     if do_subset is None:
         do_subset = []
-    if split_ext != '':
-        split_ext = '_'+split_ext
+    if mapsuffix != '':
+        mapsuffix = '_'+mapsuffix
 
+    astmask = None
+    pcamask = None
     if fn_astmask is not None:
-        print(fn_astmask)
         astmask = fits.open(fn_astmask)
+    if fn_pcamask is not None:
         pcamask = fits.open(fn_pcamask)
-        thismap = scuba2tool.get_scuba2map(fdir,astmask=astmask,pcamask=pcamask,ext=split_ext)
-        thismap_sub = [scuba2tool.get_scuba2map(fdir,prior=p,astmask=astmask,pcamask=pcamask,wcs_target=thismap.wcs) for p in do_subset]
-        pass
-    else:
-        thismap = scuba2tool.get_scuba2map(fdir,ext=split_ext)
-        thismap_sub = [scuba2tool.get_scuba2map(fdir,prior=p,wcs_target=thismap.wcs) for p in do_subset]
-        pass
+
+    thismap = scuba2tool.get_scuba2map(fdir,astmask=astmask,pcamask=pcamask,ext=mapsuffix)
+    thismap_sub = [scuba2tool.get_scuba2map(fdir,prior=p,astmask=astmask,pcamask=pcamask,wcs_target=thismap.wcs,data_target=thismap.i) for p in do_subset]
 
     cent = scuba2tool.get_tauAcent()
     fact = scuba2tool.get_fcf()
@@ -455,7 +448,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=subset_p
          pamp[ind], pang[ind], pfrc[ind]]
 
     record = pd.Series(v, index=df.columns, name='all')
-    df = df.append(record)
+    df = pd.concat([df,record.to_frame().T])
 
     for i,asub in enumerate(thismap_sub):
         pamp = scuba2tool.polamp(ret_sub_q_kai[i],ret_sub_u_kai[i])
@@ -465,7 +458,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=subset_p
              pamp[ind], pang[ind], pfrc[ind]]
 
         record = pd.Series(v, index=df.columns, name=f'#{i}')
-        df = df.append(record)
+        df = pd.concat([df,record.to_frame().T])
 
     print("\\begin{tabular}{crrrrrrr}",file=ff)
     print("\\toprule",file=ff)
@@ -504,7 +497,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=subset_p
          f'{noise_u*1000:+8.2g} $\\pm$ {noiserms_u*1000:5.2g}']
 
     record = pd.Series(v, index=df.columns, name='all')
-    df = df.append(record)
+    df = pd.concat([df,record.to_frame().T])
 
     for i,asub in enumerate(thismap_sub):
         v = [f'{noise_sub_i[i]*1000:+8.2g} $\\pm$ {noiserms_sub_i[i]*1000:5.2g}',
@@ -513,7 +506,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=subset_p
 
 
         record = pd.Series(v, index=df.columns, name=f'#{i}')
-        df = df.append(record)
+        df = pd.concat([df,record.to_frame().T])
 
     print("\\begin{tabular}{crrr}",file=ff)
     print("\\toprule",file=ff)
@@ -570,16 +563,44 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=subset_p
 
 if __name__ == '__main__':
 
-    args = sys.argv
-    if len(args)!=3:
-        print("ERROR:: run.py [DIRECTORY] [NAME_FORMAT]")
-        exit(-1)
+    ## System libraries
+    import os
+    import platform
+    print(platform.node(), platform.platform())
+    import sys
+    print(sys.version, sys.platform, sys.executable)
 
-    fdir = args[1] #"star21_850um_customPca/pca50/"
-    name_format = args[2] #"pca50_850um"
-    os.makedirs(name_format,exist_ok=True)
-    name_format2 = name_format + "/" + name_format
+    import argparse
+    parser = argparse.ArgumentParser(description='main script for processing output of starlink pol2map. required files:\n (iext.fits,qext.fits,uext.fits)')
+    parser.add_argument('dirname', help='directory to be processed')
+    parser.add_argument('--prefix', default='', help='prefix for output files (file names will be "[prefix]/[prefix]_*")')
+    parser.add_argument('--astmask', default=None, help='astmask')
+    parser.add_argument('--pcamask', default=None, help='pcamask')
+    parser.add_argument('--mapsuffix', default='', help='suffix for input map (map names will be "{i,q,u}ext_[mapsuffix].fits")')
 
-    #main(fdir,name_format2, do_subset=None, split_ext=name_format)
-    main(fdir,name_format2)#,fn_astmask='tauA/star21_850um_customPca/mask_nika.fits', fn_pcamask='tauA/star21_850um_customPca/mask_nika.fits')
+    args = parser.parse_args()
+
+    fdir = args.dirname
+    prefix = fdir.split("/")[-1]
+    if args.prefix != '':
+        prefix = args.prefix
+        pass
+
+    os.makedirs(prefix,exist_ok=True)
+    fileformat = prefix+'/'+prefix
+
+    if args.astmask is None:
+        if os.path.isfile(fdir+'/'+'astmask.fits'):
+            args.astmask = fdir+'/'+'astmask.fits'
+            pass
+        pass
+    if args.pcamask is None:
+        if os.path.isfile(fdir+'/'+'pcamask.fits'):
+            args.pcamask = fdir+'/'+'pcamask.fits'
+            pass
+        pass
+
+    main(fdir,fileformat,fn_astmask=args.astmask,fn_pcamask=args.pcamask,mapsuffix=args.mapsuffix)
+    #main(fdir,name_format2, do_subset=None, mapsuffix=name_format)
+    #,fn_astmask='tauA/star21_850um_customPca/mask_nika.fits', fn_pcamask='tauA/star21_850um_customPca/mask_nika.fits')
 
