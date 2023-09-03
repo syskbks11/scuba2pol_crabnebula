@@ -8,47 +8,28 @@ SUBSETS = ['20210807_00067_0002',
 
 def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS, mapsuffix=''):
     ## Graphic libraries
-    import matplotlib as mpl
     import matplotlib.pyplot as plt
 
     ## Scientific libraries
     import numpy as np
     import pandas as pd
-    import scipy
-    # from scipy import signal
-    # from scipy.signal import savgol_filter
-
-    ## Other libraries
-    import glob
-    import time
-    import datetime
-
-
-    ## Setting matplotlib
-    mpl.rcParams.update({'font.size': 14})
-    mpl.rcParams.update({'axes.facecolor':'w'})
-    mpl.rcParams.update({'axes.edgecolor':'k'})
-    mpl.rcParams.update({'figure.facecolor':'w'})
-    mpl.rcParams.update({'figure.edgecolor':'w'})
-    mpl.rcParams.update({'axes.grid':True})
-    mpl.rcParams.update({'grid.linestyle':':'})
-    mpl.rcParams.update({'figure.figsize':[12,9]})
 
     from astropy.io import fits
 
-    from scuba2tool import plotmap
     import scuba2tool
+    import plotmap
+    import polcalc
 
     # parameters
 
-    delt_gal = 6/3600
-    delt_fk5 = 5/3600
+    # delt_gal = 6/3600
+    # delt_fk5 = 5/3600
 
-    offsetx_rms = 0.1 #[deg]
-    offsety_rms = 0.09 #[deg]
+    # offsetx_rms = 0.1 #[deg]
+    # offsety_rms = 0.09 #[deg]
 
-    r_signal = 0.09
-    r_rms    = 0.03
+    # r_signal = 0.09
+    # r_rms    = 0.03
 
     if do_subset is None:
         do_subset = []
@@ -69,19 +50,19 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     fact = scuba2tool.get_fcf()
 
     # IQU
-    fig,ax = scuba2tool.wcs_subplots(thismap.wcs, ncols=3)
+    fig,ax = plotmap.wcs_subplots(thismap.wcs, ncols=3)
 
-    plotmap(thismap.i*fact,thismap.wcs,title='I'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=-0.2,vmax=4,fig=fig,ax=ax[0]) 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+    plotmap.plotmap(thismap.i*fact,thismap.wcs,title='I'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=-0.2,vmax=4,fig=fig,ax=ax[0]) 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    plotmap(thismap.q*fact,thismap.wcs,title='Q'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=-0.2,vmax=1,fig=fig,ax=ax[1])
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+    plotmap.plotmap(thismap.q*fact,thismap.wcs,title='Q'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=-0.2,vmax=1,fig=fig,ax=ax[1])
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    plotmap(thismap.u*fact,thismap.wcs,title='U'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=-1,vmax=0.2,fig=fig,ax=ax[2])
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+    plotmap.plotmap(thismap.u*fact,thismap.wcs,title='U'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=-1,vmax=0.2,fig=fig,ax=ax[2])
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
     fig.tight_layout()
     fig.savefig(name_format+"_iqu.pdf")
@@ -89,26 +70,26 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     plt.close()
 
     # Pol
-    fig,ax = scuba2tool.wcs_subplots(thismap.wcs, ncols=3)
+    fig,ax = plotmap.wcs_subplots(thismap.wcs, ncols=3)
 
-    d = scuba2tool.polamp(thismap.q,thismap.u) * fact
+    d = polcalc.polamp(thismap.q,thismap.u) * fact
     s = np.abs(thismap.i/thismap.di) < 2
     d[s] = 0
-    plotmap(d,thismap.wcs,title='PolAmp'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=0, vmax=1, fig=fig,ax=ax[0]) 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+    plotmap.plotmap(d,thismap.wcs,title='PolAmp'+r'$_{\rm FK5}$'+' [mJy/arcsec2]', vmin=0, vmax=1, fig=fig,ax=ax[0]) 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    d = scuba2tool.polang(thismap.q,thismap.u)
+    d = polcalc.polang(thismap.q,thismap.u)
     d[s] = 0
-    plotmap(d,thismap.wcs,title='PolAngle'+r'$_{\rm FK5}$'+' [deg]', vmin=30, vmax=180, fig=fig,ax=ax[1])
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+    plotmap.plotmap(d,thismap.wcs,title='PolAngle'+r'$_{\rm FK5}$'+' [deg]', vmin=30, vmax=180, fig=fig,ax=ax[1])
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    d = scuba2tool.polfrac(thismap.i,thismap.q,thismap.u)
+    d = polcalc.polfrac(thismap.i,thismap.q,thismap.u)
     d[s] = 0
-    plotmap(d,thismap.wcs,title='PolFrac'+r'$_{\rm FK5}$'+' ', vmin=0, vmax=0.3, fig=fig,ax=ax[2])
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+    plotmap.plotmap(d,thismap.wcs,title='PolFrac'+r'$_{\rm FK5}$'+' ', vmin=0, vmax=0.3, fig=fig,ax=ax[2])
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
     fig.tight_layout()
     fig.savefig(name_format+"_pol.pdf")
@@ -116,27 +97,27 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     plt.close()
 
     # IQU GAL
-    fig,ax = scuba2tool.wcs_subplots(thismap.gal.wcs, ncols=3)
+    fig,ax = plotmap.wcs_subplots(thismap.gal.wcs, ncols=3)
 
-    plotmap(thismap.gal.i*fact,thismap.gal.wcs,title='I'+r'$_{\rm GAL}$'+' [mJy/arcsec2]',
+    plotmap.plotmap(thismap.gal.i*fact,thismap.gal.wcs,title='I'+r'$_{\rm GAL}$'+' [mJy/arcsec2]',
             vmin=-0.2,vmax=4,fig=fig,ax=ax[0])
-    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.07,ax[0],
+    plotmap.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.07,ax[0],
                               transform='galactic',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.08,ax[0],
+    plotmap.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.08,ax[0],
                               transform='galactic',ls='-',facecolor='none',edgecolor='w')
 
-    plotmap(thismap.gal.q*fact,thismap.gal.wcs,title='Q'+r'$_{\rm GAL}$'+' [mJy/arcsec2]',
+    plotmap.plotmap(thismap.gal.q*fact,thismap.gal.wcs,title='Q'+r'$_{\rm GAL}$'+' [mJy/arcsec2]',
             vmin=-1,vmax=0.2,fig=fig,ax=ax[1])
-    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.07,ax[1],
+    plotmap.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.07,ax[1],
                               transform='galactic',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.08,ax[1],
+    plotmap.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.08,ax[1],
                               transform='galactic',ls='-',facecolor='none',edgecolor='w')
 
-    plotmap(thismap.gal.u*fact,thismap.gal.wcs,title='U'+r'$_{\rm GAL}$'+' [mJy/arcsec2]',
+    plotmap.plotmap(thismap.gal.u*fact,thismap.gal.wcs,title='U'+r'$_{\rm GAL}$'+' [mJy/arcsec2]',
             vmin=-0.2,vmax=1,fig=fig,ax=ax[2])
-    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.07,ax[2],
+    plotmap.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.07,ax[2],
                               transform='galactic',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.08,ax[2],
+    plotmap.wcsaxes_circle((cent.galactic.l,cent.galactic.b),0.08,ax[2],
                               transform='galactic',ls='-',facecolor='none',edgecolor='w')
 
     fig.tight_layout()
@@ -144,26 +125,26 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     plt.clf()
     plt.close()
 
-    fig,ax = scuba2tool.wcs_subplots(thismap.gal.wcs, ncols=3)
+    fig,ax = plotmap.wcs_subplots(thismap.gal.wcs, ncols=3)
 
-    d = scuba2tool.polamp(thismap.gal.q,thismap.gal.u) * fact
+    d = polcalc.polamp(thismap.gal.q,thismap.gal.u) * fact
     s = np.abs(thismap.gal.i/thismap.gal.di) < 2
     d[s] = 0
-    plotmap(d,thismap.gal.wcs,title='PolAmp'+r'$_{\rm GAL}$'+' [mJy/arcsec2]', vmin=0, vmax=1, fig=fig,ax=ax[0]) 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+    plotmap.plotmap(d,thismap.gal.wcs,title='PolAmp'+r'$_{\rm GAL}$'+' [mJy/arcsec2]', vmin=0, vmax=1, fig=fig,ax=ax[0]) 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    d = scuba2tool.polang(thismap.gal.q,thismap.gal.u)
+    d = polcalc.polang(thismap.gal.q,thismap.gal.u)
     d[s] = 0
-    plotmap(d,thismap.gal.wcs,title='PolAngle'+r'$_{\rm GAL}$'+' [deg]', vmin=30, vmax=180, fig=fig,ax=ax[1])
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+    plotmap.plotmap(d,thismap.gal.wcs,title='PolAngle'+r'$_{\rm GAL}$'+' [deg]', vmin=30, vmax=180, fig=fig,ax=ax[1])
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-    d = scuba2tool.polfrac(thismap.gal.i,thismap.gal.q,thismap.gal.u)
+    d = polcalc.polfrac(thismap.gal.i,thismap.gal.q,thismap.gal.u)
     d[s] = 0
-    plotmap(d,thismap.gal.wcs,title='PolFrac'+r'$_{\rm GAL}$'+' ', vmin=0, vmax=0.3, fig=fig,ax=ax[2])
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-    scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+    plotmap.plotmap(d,thismap.gal.wcs,title='PolFrac'+r'$_{\rm GAL}$'+' ', vmin=0, vmax=0.3, fig=fig,ax=ax[2])
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+    plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
     fig.tight_layout()
     fig.savefig(name_format+"_galpol.pdf")
@@ -173,38 +154,38 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     # IQU,Pol in subobs
 
     if len(thismap_sub)>0:
-        fig,ax = scuba2tool.wcs_subplots(thismap.wcs, ncols=6, nrows=len(thismap_sub))
+        fig,ax = plotmap.wcs_subplots(thismap.wcs, ncols=6, nrows=len(thismap_sub))
 
         for i,asub in enumerate(thismap_sub):
 
-            plotmap(asub.i*fact,asub.wcs,title='I'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=-0.2,vmax=4,fig=fig,ax=ax[i*6+0])
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
-            plotmap(asub.q*fact,thismap.wcs,title='Q'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=-0.2,vmax=1,fig=fig,ax=ax[i*6+1])
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
-            plotmap(asub.u*fact,asub.wcs,title='U'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=-1,vmax=0.2,fig=fig,ax=ax[i*6+2])
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+            plotmap.plotmap(asub.i*fact,asub.wcs,title='I'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=-0.2,vmax=4,fig=fig,ax=ax[i*6+0])
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+0],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+0],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+            plotmap.plotmap(asub.q*fact,thismap.wcs,title='Q'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=-0.2,vmax=1,fig=fig,ax=ax[i*6+1])
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+1],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+1],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+            plotmap.plotmap(asub.u*fact,asub.wcs,title='U'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=-1,vmax=0.2,fig=fig,ax=ax[i*6+2])
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+2],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+2],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-            d = scuba2tool.polamp(asub.q,asub.u) * fact
+            d = polcalc.polamp(asub.q,asub.u) * fact
             s = np.abs(asub.i/asub.di) < 2
             d[s] = 0
-            plotmap(d,asub.wcs,title='PolAmp'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=0, vmax=1, fig=fig,ax=ax[i*6+3]) 
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+3],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+3],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+            plotmap.plotmap(d,asub.wcs,title='PolAmp'+r'$_{\rm FK5}$'+' [mJy/arcsec2]'+f' (#{i})', vmin=0, vmax=1, fig=fig,ax=ax[i*6+3]) 
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+3],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+3],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-            d = scuba2tool.polang(asub.q,asub.u)
+            d = polcalc.polang(asub.q,asub.u)
             d[s] = 0
-            plotmap(d,asub.wcs,title='PolAngle'+r'$_{\rm FK5}$'+' [deg]'+f' (#{i})', vmin=30, vmax=180, fig=fig,ax=ax[i*6+4])
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+4],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+4],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+            plotmap.plotmap(d,asub.wcs,title='PolAngle'+r'$_{\rm FK5}$'+' [deg]'+f' (#{i})', vmin=30, vmax=180, fig=fig,ax=ax[i*6+4])
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+4],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+4],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
-            d = scuba2tool.polfrac(asub.i,asub.q,asub.u)
+            d = polcalc.polfrac(asub.i,asub.q,asub.u)
             d[s] = 0
-            plotmap(d,asub.wcs,title='PolFrac'+r'$_{\rm FK5}$'+' '+f' (#{i})', vmin=0, vmax=0.3, fig=fig,ax=ax[i*6+5])
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+5],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
-            scuba2tool.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+5],transform='fk5',ls='-',facecolor='none',edgecolor='w')
+            plotmap.plotmap(d,asub.wcs,title='PolFrac'+r'$_{\rm FK5}$'+' '+f' (#{i})', vmin=0, vmax=0.3, fig=fig,ax=ax[i*6+5])
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+5],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
+            plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+5],transform='fk5',ls='-',facecolor='none',edgecolor='w')
 
             pass
 
@@ -351,9 +332,9 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     ax[0].plot(radius_list*3600,ret_i, 'o:',c='orange',alpha=0.5)
     ax[1].plot(radius_list*3600,ret_q, 'o:',c='orange',alpha=0.5)
     ax[2].plot(radius_list*3600,ret_u, 'o:',c='orange',alpha=0.5)
-    ax[3].plot(radius_list*3600,scuba2tool.polamp(ret_q,ret_u), 'o:',c='orange',alpha=0.5)
-    ax[4].plot(radius_list*3600,scuba2tool.polang(ret_q,ret_u), 'o:',c='orange',alpha=0.5)
-    ax[5].plot(radius_list*3600,scuba2tool.polfrac(ret_i,ret_q,ret_u), 'o:',c='orange',alpha=0.5)
+    ax[3].plot(radius_list*3600,polcalc.polamp(ret_q,ret_u), 'o:',c='orange',alpha=0.5)
+    ax[4].plot(radius_list*3600,polcalc.polang(ret_q,ret_u), 'o:',c='orange',alpha=0.5)
+    ax[5].plot(radius_list*3600,polcalc.polfrac(ret_i,ret_q,ret_u), 'o:',c='orange',alpha=0.5)
 
     ax[0].plot(radius_list*3600,ret_i_kai, 'bo:')
     ax[0].set_ylabel("Integrated I [Jy]")
@@ -361,11 +342,11 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     ax[1].set_ylabel("Integrated Q [Jy]")
     ax[2].plot(radius_list*3600,ret_u_kai, 'bo:')
     ax[2].set_ylabel("Integrated U [Jy]")
-    ax[3].plot(radius_list*3600,scuba2tool.polamp(ret_q_kai,ret_u_kai), 'bo:')
+    ax[3].plot(radius_list*3600,polcalc.polamp(ret_q_kai,ret_u_kai), 'bo:')
     ax[3].set_ylabel("Integrated Ampl"+r"$_{\rm pol}$ [Jy]")
-    ax[4].plot(radius_list*3600,scuba2tool.polang(ret_q_kai,ret_u_kai), 'bo:')
+    ax[4].plot(radius_list*3600,polcalc.polang(ret_q_kai,ret_u_kai), 'bo:')
     ax[4].set_ylabel("Integrated Angle"+r"$_{\rm pol}$ [deg]")
-    ax[5].plot(radius_list*3600,scuba2tool.polfrac(ret_i_kai,ret_q_kai,ret_u_kai), 'bo:')
+    ax[5].plot(radius_list*3600,polcalc.polfrac(ret_i_kai,ret_q_kai,ret_u_kai), 'bo:')
     ax[5].set_ylabel("Integrated Frac"+r"$_{\rm pol}$")
 
     for iax in ax:
@@ -383,9 +364,9 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
         ax[0].plot(radius_list*3600,ret_sub_i_kai[i], 'o:',label=f'#{i}')
         ax[1].plot(radius_list*3600,ret_sub_q_kai[i], 'o:',label=f'#{i}')
         ax[2].plot(radius_list*3600,ret_sub_u_kai[i], 'o:',label=f'#{i}')
-        ax[3].plot(radius_list*3600,scuba2tool.polamp(ret_sub_q_kai[i],ret_sub_u_kai[i]), 'o:',label=f'#{i}')
-        ax[4].plot(radius_list*3600,scuba2tool.polang(ret_sub_q_kai[i],ret_sub_u_kai[i]), 'o:',label=f'#{i}')
-        ax[5].plot(radius_list*3600,scuba2tool.polfrac(ret_sub_i_kai[i],ret_sub_q_kai[i],ret_sub_u_kai[i]), 'o:',label=f'#{i}')
+        ax[3].plot(radius_list*3600,polcalc.polamp(ret_sub_q_kai[i],ret_sub_u_kai[i]), 'o:',label=f'#{i}')
+        ax[4].plot(radius_list*3600,polcalc.polang(ret_sub_q_kai[i],ret_sub_u_kai[i]), 'o:',label=f'#{i}')
+        ax[5].plot(radius_list*3600,polcalc.polfrac(ret_sub_i_kai[i],ret_sub_q_kai[i],ret_sub_u_kai[i]), 'o:',label=f'#{i}')
 
 
     ax[0].plot(radius_list*3600,ret_i_kai, 'ko:',label='all')
@@ -394,11 +375,11 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     ax[1].set_ylabel("Integrated Q [Jy]")
     ax[2].plot(radius_list*3600,ret_u_kai, 'ko:',label='all')
     ax[2].set_ylabel("Integrated U [Jy]")
-    ax[3].plot(radius_list*3600,scuba2tool.polamp(ret_q_kai,ret_u_kai), 'ko:',label='all')
+    ax[3].plot(radius_list*3600,polcalc.polamp(ret_q_kai,ret_u_kai), 'ko:',label='all')
     ax[3].set_ylabel("Integrated Ampl"+r"$_{\rm pol}$ [Jy]")
-    ax[4].plot(radius_list*3600,scuba2tool.polang(ret_q_kai,ret_u_kai), 'ko:',label='all')
+    ax[4].plot(radius_list*3600,polcalc.polang(ret_q_kai,ret_u_kai), 'ko:',label='all')
     ax[4].set_ylabel("Integrated Angle"+r"$_{\rm pol}$ [deg]")
-    ax[5].plot(radius_list*3600,scuba2tool.polfrac(ret_i_kai,ret_q_kai,ret_u_kai), 'ko:',label='all')
+    ax[5].plot(radius_list*3600,polcalc.polfrac(ret_i_kai,ret_q_kai,ret_u_kai), 'ko:',label='all')
     ax[5].set_ylabel("Integrated Frac"+r"$_{\rm pol}$")
 
     for iax in ax[3:6]:
@@ -413,21 +394,21 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     plt.close()
 
 
-    fig,ax = scuba2tool.wcs_subplots(thismap.wcs,ncols=4)
+    fig,ax = plotmap.wcs_subplots(thismap.wcs,ncols=4)
     if thismap.astmask is not None: 
         v = thismap.i.copy()*fact
         v[~np.isnan(thismap.astmask)] = np.nan
-        plotmap(v, thismap.wcs, fig=fig,ax=ax[0], vmin=-0.2, vmax=0.2, title='ASTmasked intensity '+r'[Jy/$\rm arcsec^2$]')
+        plotmap.plotmap(v, thismap.wcs, fig=fig,ax=ax[0], vmin=-0.2, vmax=0.2, title='ASTmasked intensity '+r'[Jy/$\rm arcsec^2$]')
         v = thismap.i.copy()*fact
         v[np.isnan(thismap.astmask)] = np.nan
-        plotmap(v,thismap.wcs, fig=fig,ax=ax[1], vmin=-0.2, vmax=0.2, title='ASTmasked intensity '+r'[Jy/$\rm arcsec^2$]')
+        plotmap.plotmap(v,thismap.wcs, fig=fig,ax=ax[1], vmin=-0.2, vmax=0.2, title='ASTmasked intensity '+r'[Jy/$\rm arcsec^2$]')
     if thismap.pcamask is not None:
         v = thismap.i.copy()*fact
         v[~np.isnan(thismap.pcamask)] = np.nan
-        plotmap(v, thismap.wcs, fig=fig,ax=ax[2], vmin=-0.2, vmax=0.2, title='PCAmasked intensity '+r'[Jy/$\rm arcsec^2$]')
+        plotmap.plotmap(v, thismap.wcs, fig=fig,ax=ax[2], vmin=-0.2, vmax=0.2, title='PCAmasked intensity '+r'[Jy/$\rm arcsec^2$]')
         v = thismap.i.copy()*fact
         v[np.isnan(thismap.pcamask)] = np.nan
-        plotmap(v,thismap.wcs, fig=fig,ax=ax[3], vmin=-0.2, vmax=0.2, title='PCAmasked intensity '+r'[Jy/$\rm arcsec^2$]')
+        plotmap.plotmap(v,thismap.wcs, fig=fig,ax=ax[3], vmin=-0.2, vmax=0.2, title='PCAmasked intensity '+r'[Jy/$\rm arcsec^2$]')
     fig.tight_layout()
     fig.savefig(name_format+"_mask.pdf")
     plt.clf()
@@ -441,9 +422,9 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
 
     ind = np.argmin(np.abs(radius_list-0.08))
 
-    pamp = scuba2tool.polamp(ret_q_kai,ret_u_kai)
-    pang = scuba2tool.polang(ret_q_kai,ret_u_kai)
-    pfrc = scuba2tool.polfrac(ret_i_kai,ret_q_kai,ret_u_kai)
+    pamp = polcalc.polamp(ret_q_kai,ret_u_kai)
+    pang = polcalc.polang(ret_q_kai,ret_u_kai)
+    pfrc = polcalc.polfrac(ret_i_kai,ret_q_kai,ret_u_kai)
     v = [ret_i_kai[ind],ret_q_kai[ind],ret_u_kai[ind],
          pamp[ind], pang[ind], pfrc[ind]]
 
@@ -451,9 +432,9 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     df = pd.concat([df,record.to_frame().T])
 
     for i,asub in enumerate(thismap_sub):
-        pamp = scuba2tool.polamp(ret_sub_q_kai[i],ret_sub_u_kai[i])
-        pang = scuba2tool.polang(ret_sub_q_kai[i],ret_sub_u_kai[i])
-        pfrc = scuba2tool.polfrac(ret_sub_i_kai[i],ret_sub_q_kai[i],ret_sub_u_kai[i])
+        pamp = polcalc.polamp(ret_sub_q_kai[i],ret_sub_u_kai[i])
+        pang = polcalc.polang(ret_sub_q_kai[i],ret_sub_u_kai[i])
+        pfrc = polcalc.polfrac(ret_sub_i_kai[i],ret_sub_q_kai[i],ret_sub_u_kai[i])
         v = [ret_sub_i_kai[i][ind],ret_sub_q_kai[i][ind],ret_sub_u_kai[i][ind],
              pamp[ind], pang[ind], pfrc[ind]]
 
