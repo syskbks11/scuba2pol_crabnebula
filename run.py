@@ -7,6 +7,7 @@ SUBSETS = ['20210807_00067_0002',
            '20210825_00046_0002']
 
 def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS, mapsuffix=''):
+
     ## Graphic libraries
     import matplotlib.pyplot as plt
 
@@ -15,6 +16,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     import pandas as pd
 
     from astropy.io import fits
+    from tqdm import tqdm
 
     import scuba2tool
     import plotmap
@@ -49,6 +51,8 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     cent = scuba2tool.get_tauAcent()
     fact = scuba2tool.get_fcf()
 
+    bar = tqdm(total=11+(2*len(thismap_sub)))
+
     # IQU
     fig,ax = plotmap.wcs_subplots(thismap.wcs, ncols=3)
 
@@ -68,6 +72,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     fig.savefig(name_format+"_iqu.pdf")
     plt.clf()
     plt.close()
+    bar.update(1)
 
     # Pol
     fig,ax = plotmap.wcs_subplots(thismap.wcs, ncols=3)
@@ -95,6 +100,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     fig.savefig(name_format+"_pol.pdf")
     plt.clf()
     plt.close()
+    bar.update(1)
 
     # IQU GAL
     fig,ax = plotmap.wcs_subplots(thismap.gal.wcs, ncols=3)
@@ -124,6 +130,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     fig.savefig(name_format+"_galiqu.pdf")
     plt.clf()
     plt.close()
+    bar.update(1)
 
     fig,ax = plotmap.wcs_subplots(thismap.gal.wcs, ncols=3)
 
@@ -150,6 +157,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     fig.savefig(name_format+"_galpol.pdf")
     plt.clf()
     plt.close()
+    bar.update(1)
 
     # IQU,Pol in subobs
 
@@ -186,13 +194,14 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
             plotmap.plotmap(d,asub.wcs,title='PolFrac'+r'$_{\rm FK5}$'+' '+f' (#{i})', vmin=0, vmax=0.3, fig=fig,ax=ax[i*6+5])
             plotmap.wcsaxes_circle((cent.ra,cent.dec),0.07,ax[i*6+5],transform='fk5',ls='-',facecolor='none',edgecolor='w') 
             plotmap.wcsaxes_circle((cent.ra,cent.dec),0.08,ax[i*6+5],transform='fk5',ls='-',facecolor='none',edgecolor='w')
-
+            bar.update(1)
             pass
 
         fig.tight_layout()
         fig.savefig(name_format+"_subobs.pdf")
         plt.clf()
         plt.close()
+        bar.update(1)
 
 
     # signal integration / aparture photometory
@@ -275,6 +284,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     fig.savefig(name_format+"_noise.pdf")
     plt.clf()
     plt.close()
+    bar.update(1)
 
     ret_sub_i_kai = [None]*len(thismap_sub)
     ret_sub_q_kai = [None]*len(thismap_sub)
@@ -316,6 +326,8 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
             ax[i*3+1].set_title(f"noise Q = {noise_sub_q[i] *1000:+8.2g}  ± {noiserms_sub_q[i] *1000:5.2g} mJy/arcsec2 (#{i})")
             ax[i*3+2].set_title(f"noise U = {noise_sub_u[i] *1000:+8.2g}  ± {noiserms_sub_u[i] *1000:5.2g} mJy/arcsec2 (#{i})")
             ax[i*3+0].set_ylabel("entries")
+            bar.update(1)
+            pass
 
         ax[(len(thismap_sub)-1)*3+0].set_xlabel("noise [mJy/arcsec2]")
         ax[(len(thismap_sub)-1)*3+1].set_xlabel("noise [mJy/arcsec2]")
@@ -325,6 +337,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
         fig.savefig(name_format+"_noise_subobs.pdf")
         plt.clf()
         plt.close()
+        bar.update(1)
 
     fig,ax = plt.subplots(figsize=(18,8),ncols=3,nrows=2)
     ax = ax.flatten()
@@ -356,6 +369,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     fig.savefig(name_format+"_integrated.pdf")
     plt.clf()
     plt.close()
+    bar.update(1)
 
     fig,ax = plt.subplots(figsize=(18,8),ncols=3,nrows=2, sharex=True)
     ax = ax.flatten()
@@ -392,6 +406,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     fig.savefig(name_format+"_integrated_subobs.pdf")
     plt.clf()
     plt.close()
+    bar.update(1)
 
 
     fig,ax = plotmap.wcs_subplots(thismap.wcs,ncols=4)
@@ -413,6 +428,7 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
     fig.savefig(name_format+"_mask.pdf")
     plt.clf()
     plt.close()
+    bar.update(1)
 
     ff = open(name_format+'_latex.tex', 'w')
     ff = open(name_format+'_latex.tex', 'a')
@@ -541,6 +557,8 @@ def main(fdir, name_format, fn_astmask=None, fn_pcamask=None, do_subset=SUBSETS,
         print("\\end{figure}",file=ff)
         print('',file=ff)
 
+    bar.update(1)
+    bar.close()
 
 if __name__ == '__main__':
 
